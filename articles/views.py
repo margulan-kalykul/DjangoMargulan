@@ -8,7 +8,7 @@ from .models import Article, Tag
 def createArticle(request):
     try:
         title = request.POST["title"]
-        author  = request.POST["author"]
+        author = request.POST["author"]
         text = request.POST["article"]
         tags = request.POST["tags"].split(sep=' ')
     except:
@@ -21,16 +21,9 @@ def createArticle(request):
         )
     else:
         new_article = Article.objects.create(title=title, author=author, text=text)
-        all_tags = [tag.tag for tag in Tag.objects.all()]
-        all_tag_ids = [tag.id for tag in Tag.objects.all()]
+        
         for tag in tags:
-            if tag not in all_tags:
-                new_tag = Tag.objects.create(tag=tag)
-            else:
-                for i in range(len(all_tags)):
-                    if all_tags[i] == tag:
-                        new_tag = Tag.objects.get(pk=all_tag_ids[i])
-                        break
+            new_tag = Tag.objects.get_or_create(name=tag)[0]
             new_tag.articles.add(new_article)
 
         context = {}
