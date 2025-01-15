@@ -15,7 +15,7 @@ def createArticle(request):
             title = form.cleaned_data["title"]
             author = form.cleaned_data["author"]
             text = form.cleaned_data["text"]
-            tags = form.cleaned_data["tags"].split(sep=' ')
+            tags = form.cleaned_data["tags"]
 
             new_article = Article.objects.create(title=title, author=author, text=text)
             for tag in tags:
