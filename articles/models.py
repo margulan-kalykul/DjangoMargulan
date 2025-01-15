@@ -13,7 +13,7 @@ class Article(models.Model):
     text = models.TextField(default='Default text')
     author = models.CharField(max_length=100)
     tags = models.ManyToManyField(Tag, related_name='articles')
-    image = models.ImageField(default="https://freesvg.org/img/Website-No-Image-Icon.png")
+    # image = models.ImageField(default="https://freesvg.org/img/Website-No-Image-Icon.png")
 
     def __str__(self):
         return f'"{self.title}" by {self.author}'

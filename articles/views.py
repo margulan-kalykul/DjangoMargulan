@@ -1,34 +1,40 @@
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from .models import Article, Tag
+from .forms import ArticleForm
+
 
 @csrf_exempt
 def createArticle(request):
-    try:
-        title = request.POST["title"]
-        author = request.POST["author"]
-        text = request.POST["article"]
-        tags = request.POST["tags"].split(sep=' ')
-    except:
-        return render(
-            request,
-            "polls/index.html",
-            {
-                "error": "Didn't complete the form"
-            },
-        )
+    if request.method == "POST":
+        form = ArticleForm(request.POST)
+        # Validate the form
+        if form.is_valid():
+            title = form.cleaned_data["title"]
+            author = form.cleaned_data["author"]
+            text = form.cleaned_data["text"]
+            tags = form.cleaned_data["tags"].split(sep=' ')
+
+            new_article = Article.objects.create(title=title, author=author, text=text)
+            for tag in tags:
+                new_tag = Tag.objects.get_or_create(name=tag)[0]
+                new_tag.articles.add(new_article)
+
+            return HttpResponse("Thank you for submitting the form")
     else:
-        new_article = Article.objects.create(title=title, author=author, text=text)
+        form = ArticleForm()
+
+    return render(
+        request,
+        "polls/index.html",
+        {
+            "form": form,
+            "error": "Didn't complete the form"
+        },
+    )
         
-        for tag in tags:
-            new_tag = Tag.objects.get_or_create(name=tag)[0]
-            new_tag.articles.add(new_article)
-
-        context = {}
-        return render(request, "polls/index.html", context)
-
 
 @csrf_exempt
 def deleteArticle(request):
