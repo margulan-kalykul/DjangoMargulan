@@ -1,0 +1,11 @@
+<p><strong>{{ error }}</strong></p> <br>
+<form action="{% url 'create' %}" method="post">
+    {% csrf_token %}
+    <fieldset>
+        <input type="text" name="title" placeholder="Input title">
+        <input type="text" name="author" placeholder="Input author name">
+        <input type="text" name="article" placeholder="Input your article's text">
+        <input type="text" name="tags" placeholder="Input tags seperated by whitespace">
+    </fieldset>
+    <input type="submit" value="Submit">
+</form>
