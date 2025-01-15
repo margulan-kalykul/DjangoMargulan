@@ -17,9 +17,15 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from articles import views
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('create/', views.createArticle, name="create"),
     path('delete/', views.deleteArticle, name="delete"),
+    path('articles/', views.articlesList, name="articleList"),
     path('admin/', admin.site.urls),
 ]
+
+if settings.DEBUG:  # Serve media files in development
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
