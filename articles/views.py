@@ -5,6 +5,7 @@ from django.shortcuts import render
 from .models import Article, Tag
 from .forms import ArticleForm
 from django.db import connection
+from .filters import ArticleFilter
 
 
 @csrf_exempt
@@ -39,19 +40,21 @@ def createArticle(request):
 
 
 def articlesList(request):
-    articles = Article.objects.prefetch_related('tags').all()
-    print(articles.query)
-    print(connection.queries)
+    # TODO: Read about django n+1 problem
+    # articles = Article.objects.prefetch_related('tags').all()
+    filterset = ArticleFilter(request.GET, queryset=Article.objects.all())
+    # print(articles.query)
+    # print(connection.queries)
     context = {
-        "articles": articles,
+        "filterset": filterset
     }
     html = render(
         request,
         "polls/articles.html",
         context
     )
-    print(connection.queries)
-    print(len(connection.queries))
+    # print(connection.queries)
+    # print(len(connection.queries))
     return html
         
 
