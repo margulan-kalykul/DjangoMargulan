@@ -9,8 +9,9 @@ class Tag(models.Model):
 
 
 class Article(models.Model):
-    title = models.CharField(max_length=200)
+    title = models.CharField(max_length=200, db_index=True)
     text = models.TextField(default='Default text')
+    # SelectRelated prefetch_related n+1 problem in django
     author = models.CharField(max_length=100)
     tags = models.ManyToManyField(Tag, related_name='articles')
     image = models.ImageField(upload_to='saved', null=True, blank=True)

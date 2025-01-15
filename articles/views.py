@@ -4,6 +4,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from .models import Article, Tag
 from .forms import ArticleForm
+from django.db import connection
 
 
 @csrf_exempt
@@ -38,15 +39,20 @@ def createArticle(request):
 
 
 def articlesList(request):
-    articles = Article.objects.all()
-    
-    return render(
+    articles = Article.objects.prefetch_related('tags').all()
+    print(articles.query)
+    print(connection.queries)
+    context = {
+        "articles": articles,
+    }
+    html = render(
         request,
         "polls/articles.html",
-        {
-            "articles": articles,
-        }
+        context
     )
+    print(connection.queries)
+    print(len(connection.queries))
+    return html
         
 
 @csrf_exempt

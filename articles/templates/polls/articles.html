@@ -15,6 +15,9 @@
                 <h1>{{ article.title }}</h1>
                 <h3>by {{ article.author }}</h3>
                 <p>{{ article.text }}</p>
+                {% for tag in article.tags.all %}
+                    <p>{{ tag }}</p>
+                {% endfor %}
                 {% if article.image %}
                     <img src="{{ article.image.url }}" alt="{{ article.title }}" style="max-width: 300px;">
                 {% else %}
