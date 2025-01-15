@@ -5,7 +5,7 @@ class ArticleForm(forms.ModelForm):
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
         widget=forms.CheckboxSelectMultiple,  # Use a checkbox for selecting multiple tags
-        required=False,)
+        required=False)
     class Meta:
         model = Article
         fields = '__all__'

@@ -39,9 +39,7 @@ def createArticle(request):
 
 def articlesList(request):
     articles = Article.objects.all()
-    # for i in range(len(article_objects)):
-    #     articles[i].tags = article_objects[i]
-
+    
     return render(
         request,
         "polls/articles.html",
