@@ -42,7 +42,7 @@ def createArticle(request):
 def articlesList(request):
     # TODO: Read about django n+1 problem
     # articles = Article.objects.prefetch_related('tags').all()
-    filterset = ArticleFilter(request.GET, queryset=Article.objects.all())
+    filterset = ArticleFilter(request.GET, queryset=Article.objects.prefetch_related('tags').all())
     # print(articles.query)
     # print(connection.queries)
     context = {
