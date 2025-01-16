@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import render, get_object_or_404
 from .models import Article, Tag
 from .forms import ArticleForm
@@ -31,14 +31,14 @@ def createArticle(request):
 
 def updateArticle(request, id):
     article = get_object_or_404(Article, pk=id)
-    print(article)
+    # print(article)
     if request.method == "POST":
         form = ArticleForm(request.POST, request.FILES, instance=article)
         # Validate the form
-        print(form)
+        # print(form)
         if form.is_valid():
             form.save()
-            print(form)
+            # print(form)
             return HttpResponseRedirect('/articles/')
     else:
         form = ArticleForm(instance=article)
@@ -51,7 +51,21 @@ def updateArticle(request, id):
             "form": form,
             "error": "Didn't complete the form"
         },
-    )    
+    )
+
+
+def articleDetails(request, id):
+    try:
+        article = get_object_or_404(Article, pk=id)
+    except Http404 as e:
+        return HttpResponse("404 article doesn't exist")
+    return render(
+        request,
+        "polls/details.html",
+        {
+            "article": article
+        },
+    )
 
 
 def articlesList(request):
@@ -71,6 +85,15 @@ def articlesList(request):
     # print(connection.queries)
     # print(len(connection.queries))
     return html
+
+
+def deleteArticle(request, id):
+    try:
+        article = get_object_or_404(Article, pk=id)
+    except Http404 as e:
+        return HttpResponse("404 article doesn't exist")
+    article.delete()
+    return HttpResponseRedirect('/articles/')
         
 
 @csrf_exempt
