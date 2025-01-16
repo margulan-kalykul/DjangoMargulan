@@ -8,6 +8,7 @@ from django.db import connection
 from .filters import ArticleFilter
 
 
+# Create a new article
 @csrf_exempt
 def createArticle(request):
     if request.method == "POST":
@@ -21,7 +22,7 @@ def createArticle(request):
 
     return render(
         request,
-        "polls/index.html",
+        "polls/create.html",
         {
             "form": form,
             "error": "Didn't complete the form"
@@ -29,6 +30,7 @@ def createArticle(request):
     )
 
 
+# Update article
 def updateArticle(request, id):
     article = get_object_or_404(Article, pk=id)
     # print(article)
@@ -54,6 +56,7 @@ def updateArticle(request, id):
     )
 
 
+# Show article details
 def articleDetails(request, id):
     try:
         article = get_object_or_404(Article, pk=id)
@@ -68,6 +71,7 @@ def articleDetails(request, id):
     )
 
 
+# Show all articles
 def articlesList(request):
     # TODO: Read about django n+1 problem
     # articles = Article.objects.prefetch_related('tags').all()
@@ -87,6 +91,7 @@ def articlesList(request):
     return html
 
 
+# Delete given article
 def deleteArticle(request, id):
     try:
         article = get_object_or_404(Article, pk=id)
@@ -96,6 +101,7 @@ def deleteArticle(request, id):
     return HttpResponseRedirect('/articles/')
         
 
+# Delete all articles
 @csrf_exempt
 def deleteArticles(request):
     Article.objects.all().delete()
