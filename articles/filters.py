@@ -11,6 +11,3 @@ class ArticleFilter(django_filters.FilterSet):
         widget=forms.CheckboxSelectMultiple,
         conjoined=True,
     )
-    # TODO
-    # new accepted rejected
-    # date of creation

@@ -12,6 +12,7 @@
                 <h1>{{ article.title }}</h1>
                 <h3>by {{ article.author }}</h3>
                 <p>{{ article.text }}</p>
+                <p>Created: {{ article.created_at }}</p>
                 {% for tag in article.tags.all %}
                     <p>{{ tag }}</p>
                 {% endfor %}
