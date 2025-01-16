@@ -20,6 +20,8 @@ def createArticle(request):
     else:
         form = ArticleForm()
 
+    
+
     return render(
         request,
         "polls/create.html",
@@ -60,7 +62,7 @@ def updateArticle(request, id):
 def articleDetails(request, id):
     try:
         article = get_object_or_404(Article, pk=id)
-    except Http404 as e:
+    except Http404:
         return HttpResponse("404 article doesn't exist")
     return render(
         request,
@@ -95,7 +97,7 @@ def articlesList(request):
 def deleteArticle(request, id):
     try:
         article = get_object_or_404(Article, pk=id)
-    except Http404 as e:
+    except Http404:
         return HttpResponse("404 article doesn't exist")
     article.delete()
     return HttpResponseRedirect('/articles/')
