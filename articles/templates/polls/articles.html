@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html>
 <body>
+    <p>{{ s }}</p>
+    {% comment %} <p><strong>
+        {% if error %}
+            {{ error }}
+        {% endif %}
+    </strong></p> <br>
+    <form enctype="multipart/form-data" action="{% url 'articles' %}" method="post">
+        {% csrf_token %}
+        {{ form }}
+        <input type="submit" value="Submit">
+    </form>
+
     <form method="get">
         {{ filterset.form.as_p }}
         <button type="submit">Filter</button>
@@ -24,5 +36,5 @@
                 {% endif %}
             </li>
         {% endfor %}
-    </ul>
+    </ul> {% endcomment %}
 </body>
