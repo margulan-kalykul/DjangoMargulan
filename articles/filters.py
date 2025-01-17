@@ -5,7 +5,7 @@ from django import forms
 class ArticleFilter(django_filters.FilterSet):
     # Filter by title if it contains the given string, case insensitive
     title = django_filters.CharFilter(lookup_expr='icontains')
-    
+
     # Choose what tags the articles should have
     tags = django_filters.ModelMultipleChoiceFilter(
         field_name='tags__name', 
@@ -23,7 +23,7 @@ class ArticleFilter(django_filters.FilterSet):
     )
 
     def status_filter(self, queryset, name, value):
-        if (value):
+        if value:
             return queryset.filter(status__in=[Article.Status.NEW, Article.Status.ACCEPTED])
         return queryset
     

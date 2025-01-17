@@ -1,27 +1,26 @@
-from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import render, get_object_or_404
-from .models import Article, Tag
+from .models import Article
 from .forms import ArticleForm
-from django.db import connection
 from .filters import ArticleFilter
 
 
 # Create a new article
 @csrf_exempt
 def createArticle(request):
+    new_article: Article | None = None
     if request.method == "POST":
         form = ArticleForm(request.POST, request.FILES)
         # Validate the form
         if form.is_valid():
             form.save()
+            print("It's actually created")
             return HttpResponseRedirect('/articles/')
     else:
         form = ArticleForm()
 
-    
-
+    print("It's None")
     return render(
         request,
         "polls/create.html",
