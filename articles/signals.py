@@ -2,15 +2,16 @@ import openai
 from django.dispatch import receiver
 from .models import Article
 from django.db.models.signals import post_save
-from secret_keys import OPENAI_API
+from .secret_keys import OPENAI_API
 
 
 openai.api_key = OPENAI_API
 messages = [{"role": "system", "content":"You are a intelligent assistant."}]
 
+
 @receiver(post_save, sender=Article)
 def chatgpt_check(sender, instance, created, **kwargs):
-    print("Recieved")
+    print("Received")
     if not created:
         return
     text = instance.text

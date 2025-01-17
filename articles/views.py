@@ -8,8 +8,7 @@ from .filters import ArticleFilter
 
 # Create a new article
 @csrf_exempt
-def createArticle(request):
-    new_article: Article | None = None
+def create_article(request):
     if request.method == "POST":
         form = ArticleForm(request.POST, request.FILES)
         # Validate the form
@@ -32,7 +31,7 @@ def createArticle(request):
 
 
 # Update article
-def updateArticle(request, id):
+def update_article(request, id):
     article = get_object_or_404(Article, pk=id)
     # print(article)
     if request.method == "POST":
@@ -58,7 +57,7 @@ def updateArticle(request, id):
 
 
 # Show article details
-def articleDetails(request, id):
+def article_details(request, id):
     try:
         article = get_object_or_404(Article, pk=id)
     except Http404:
@@ -73,7 +72,7 @@ def articleDetails(request, id):
 
 
 # Show all articles
-def articlesList(request):
+def articles_list(request):
     # TODO: Read about django n+1 problem
     # articles = Article.objects.prefetch_related('tags').all()
     filterset = ArticleFilter(request.GET, queryset=Article.objects.prefetch_related('tags').all())
@@ -93,7 +92,7 @@ def articlesList(request):
 
 
 # Delete given article
-def deleteArticle(request, id):
+def delete_article(request, id):
     try:
         article = get_object_or_404(Article, pk=id)
     except Http404:
@@ -104,6 +103,6 @@ def deleteArticle(request, id):
 
 # Delete all articles
 @csrf_exempt
-def deleteArticles(request):
+def delete_articles(request):
     Article.objects.all().delete()
     return HttpResponse("Emptied")

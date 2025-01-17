@@ -19,16 +19,22 @@ from django.urls import path
 from articles import views
 from django.conf import settings
 from django.conf.urls.static import static
+from debug_toolbar.toolbar import debug_toolbar_urls
 
 urlpatterns = [
-    path('create/', views.createArticle, name="create"),
-    path('deleteArticle/<int:id>/', views.deleteArticle, name="deleteArticle"),
-    path('delete/', views.deleteArticles, name="delete"),
-    path('update/<int:id>/', views.updateArticle, name="update"),
-    path('article/<int:id>', views.articleDetails, name="article"),
-    path('articles/', views.articlesList, name="articleList"),
+    path('create/', views.create_article, name="create"),
+    path('delete_article/<int:id>/', views.delete_article, name="delete_article"),
+    path('delete/', views.delete_articles, name="delete"),
+    path('update/<int:id>/', views.update_article, name="update"),
+    path('article/<int:id>', views.article_details, name="article"),
+    path('articles/', views.articles_list, name="articleList"),
     path('admin/', admin.site.urls),
-]
+] + debug_toolbar_urls()
+
+# if not settings.TESTING:
+#     urlpatterns = [
+#         *urlpatterns,
+#     ] + debug_toolbar_urls()
 
 if settings.DEBUG:  # Serve media files in development
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

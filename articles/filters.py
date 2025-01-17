@@ -2,8 +2,9 @@ import django_filters
 from .models import Tag, Article
 from django import forms
 
+
 class ArticleFilter(django_filters.FilterSet):
-    # Filter by title if it contains the given string, case insensitive
+    # Filter by title if it contains the given string, case-insensitive
     title = django_filters.CharFilter(lookup_expr='icontains')
 
     # Choose what tags the articles should have

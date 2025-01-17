@@ -35,6 +35,8 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'debug_toolbar',
+    'rest_framework',
     'django_filters',
     'articles.apps.ArticlesConfig',
     'django.contrib.admin',
@@ -46,6 +48,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # Warning: The order of MIDDLEWARE is important. You should include the Debug Toolbar middleware as early 
+    # as possible in the list. However, it must come after any other middleware that encodes the response’s content, 
+    # such as GZipMiddleware.
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -54,6 +60,22 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+INTERNAL_IPS = [
+    '127.0.0.1',
+]
+
+# TESTING = "test" in sys.argv
+
+# if not TESTING:
+#     INSTALLED_APPS = [
+#         *INSTALLED_APPS,
+#         "debug_toolbar",
+#     ]
+#     MIDDLEWARE = [
+#         "debug_toolbar.middleware.DebugToolbarMiddleware",
+#         *MIDDLEWARE,
+#     ]
 
 ROOT_URLCONF = 'mysite.urls'
 

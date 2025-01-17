@@ -1,6 +1,7 @@
 from django import forms
 from .models import Article, Tag
 
+
 class ArticleForm(forms.ModelForm):
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.all(),
