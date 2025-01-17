@@ -13,6 +13,6 @@
 {% endif %}
 <p>{{ article.text }}</p>
 
-<a href="{% url 'update' id=article.id %}" class="btn btn-primary">Update</a>
+<a href="{% url 'update' pk=article.id %}" class="btn btn-primary">Update</a>
 <br><br><br>
-<a href="{% url 'delete_article' id=article.id %}" class="btn btn-primary">Delete</a>
+<a href="{% url 'delete_article' pk=article.id %}" class="btn btn-primary">Delete</a>

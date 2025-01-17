@@ -3,6 +3,8 @@ from .models import Article, Tag
 
 
 class ArticleSerializer(serializers.ModelSerializer):
+    # image = serializers.ImageField
+
     class Meta:
         model = Article
         fields = '__all__'
