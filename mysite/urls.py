@@ -24,10 +24,10 @@ from debug_toolbar.toolbar import debug_toolbar_urls
 urlpatterns = [
     # path('create/', views.create_article, name="create"),
     path('articles/', views.ArticlesList.as_view(), name="articles"),
-    path('articles/<int:pk>/', views.article_details, name="article"),
-    path('delete_article/<int:pk>/', views.delete_article, name="delete_article"),
-    path('delete/', views.delete_articles, name="delete"),
-    path('update/<int:pk>/', views.update_article, name="update"),
+    path('articles/<int:pk>/', views.ArticleDetail.as_view(), name="article"),
+    # path('delete_article/<int:pk>/', views.ArticleDetail.as_view(), name="delete_article"),
+    # path('delete/', views.delete_articles, name="delete"),
+    # path('update/<int:pk>/', views.update_article, name="update"),
     path('admin/', admin.site.urls),
     path('rest/', include('rest_framework.urls')),
 ] + debug_toolbar_urls()

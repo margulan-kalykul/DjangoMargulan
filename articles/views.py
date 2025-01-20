@@ -36,71 +36,33 @@ class ArticlesList(generics.GenericAPIView,
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-       
 
 
 # Show article details
-@api_view(['GET', ])
-def article_details(request, pk):
-    try:
-        article = get_object_or_404(Article, pk=pk)
-    except Http404:
-        return Response(status=status.HTTP_404_NOT_FOUND)
+class ArticleDetail(generics.GenericAPIView,
+                    mixins.RetrieveModelMixin,
+                    mixins.DestroyModelMixin):
+    queryset = Article.objects.prefetch_related('tags').all()
+    serializer_class = ArticleSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = ArticleFilter
+
+    def get_article(pk):
+        try:
+            return get_object_or_404(Article, pk=pk)
+        except Http404:
+            raise Http404
+
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
     
-    if request.method == 'GET':
-        serializer = ArticleSerializer(article)
-        # return render(
-        #     request,
-        #     "polls/details.html",
-        #     {
-        #         "article": article
-        #     },
-        # )
-        return Response(serializer.data)
-
-
-# Update article
-@api_view(['GET', 'POST'])
-def update_article(request, pk):
-    try:
-        article = get_object_or_404(Article, pk=pk)
-    except Http404:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == "POST":
-        form = ArticleForm(request.POST, request.FILES, instance=article)
-        # Validate the form
-        if form.is_valid():
-            article = form.save()
-            return HttpResponseRedirect(reverse('articles'))
-    elif request.method == 'GET':
-        form = ArticleForm(instance=article)
-        serializer = ArticleSerializer(article)
-        return render(
-            request,
-            "polls/update.html",
-            {
-                "pk": pk,
-                "form": form,
-                "error": "Didn't complete the form"
-            },
-        )
-
-# TODO: Finish the rest of views and make chache ignored
-# Delete given article
-@api_view(['DELETE'])
-def delete_article(request, pk):
-    try:
-        article = get_object_or_404(Article, pk=pk)
-    except Http404:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-    article.delete()
-    return HttpResponseRedirect(reverse('articles'))
-        
-
-# Delete all articles
-@api_view(['DELETE'])
-def delete_articles(request):
-    Article.objects.all().delete()
-    return Response({"message": "All articles are deleted"}, status=status.HTTP_204_NO_CONTENT)
+    def post(self, request, pk):
+        article = self.get_article(pk)
+        serializer = ArticleCreationSerializer(article, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_404_NOT_FOUND)
+    
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(self, request, *args, **kwargs)
