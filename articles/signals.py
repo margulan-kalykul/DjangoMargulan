@@ -6,7 +6,7 @@ from .secret_keys import OPENAI_API
 
 
 openai.api_key = OPENAI_API
-messages = [{"role": "system", "content":"You are a intelligent assistant."}]
+messages = [{"role": "system", "content": "You are a intelligent assistant."}]
 
 
 @receiver(post_save, sender=Article)

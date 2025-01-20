@@ -1,18 +1,13 @@
-from django.urls import reverse
-from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse, JsonResponse, HttpResponseRedirect, Http404
-from django.shortcuts import render, get_object_or_404
+from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, generics, mixins
-from rest_framework.decorators import api_view
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
-from .models import Article
-from .forms import ArticleForm
+from .models import Article, Comment
 from .filters import ArticleFilter
-from .serializers import ArticleSerializer, ArticleCreationSerializer
+from .serializers import ArticleSerializer, ArticleCreationSerializer, CommentSerializer
 
 
 # Form to create a new article and list of all articles
@@ -26,7 +21,6 @@ class ArticlesList(generics.GenericAPIView,
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
     
-    # TODO: Resolve creation problem
     def post(self, request):
         serializer = ArticleCreationSerializer(data=request.data)
         # Validate the form
@@ -47,7 +41,7 @@ class ArticleDetail(generics.GenericAPIView,
     filter_backends = [DjangoFilterBackend]
     filterset_class = ArticleFilter
 
-    def get_article(pk):
+    def get_article(self, pk):
         try:
             return get_object_or_404(Article, pk=pk)
         except Http404:
@@ -56,8 +50,8 @@ class ArticleDetail(generics.GenericAPIView,
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
     
-    def post(self, request, pk):
-        article = self.get_article(pk)
+    def put(self, request, pk):
+        article = self.get_article(pk=pk)
         serializer = ArticleCreationSerializer(article, data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -66,3 +60,51 @@ class ArticleDetail(generics.GenericAPIView,
     
     def delete(self, request, *args, **kwargs):
         return self.destroy(self, request, *args, **kwargs)
+    
+
+# Show list of comments on an article
+class CommentList(generics.GenericAPIView,
+                  mixins.ListModelMixin):
+    queryset = Comment.objects.select_related('article').all()
+    serializer_class = CommentSerializer
+
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+    def post(self, request):
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Show specific comment
+class CommentDetails(generics.GenericAPIView,
+                     mixins.RetrieveModelMixin,
+                     mixins.DestroyModelMixin):
+    queryset = Comment.objects.select_related('article').all()
+    serializer_class = CommentSerializer
+    # filter_backends = [DjangoFilterBackend]
+    # filterset_class = ArticleFilter
+
+    def get_comment(self, pk):
+        try:
+            return get_object_or_404(Comment, pk=pk)
+        except Http404:
+            raise Http404
+
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
+
+    def put(self, request, pk):
+        comment = self.get_comment(pk=pk)
+        serializer = CommentSerializer(comment, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
+
