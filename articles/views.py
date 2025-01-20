@@ -7,14 +7,15 @@ from rest_framework.response import Response
 
 from .models import Article, Comment
 from .filters import ArticleFilter
-from .serializers import ArticleSerializer, ArticleCreationSerializer, CommentSerializer, ArticleWithCommentsSerializer
+from .serializers import ArticleSerializer, ArticleCreationSerializer, CommentSerializer, SmallCommentSerializer, \
+    ArticleWithCommentsSerializer
 
 
 # Form to create a new article and list of all articles
 class ArticlesList(generics.GenericAPIView,
                    mixins.ListModelMixin):
     queryset = Article.objects.prefetch_related('tags').all()
-    serializer_class = ArticleSerializer
+    serializer_class = SmallCommentSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = ArticleFilter
 
@@ -49,7 +50,9 @@ class ArticleDetail(generics.GenericAPIView,
         
     def retrieve(self, request, *args, **kwargs):
         article = self.get_object()
-        serializer = ArticleWithCommentsSerializer(article)
+        serializer = ArticleWithCommentsSerializer(article)  # SmallCommentSerializer(article)
+        # test = SmallCommentSerializer(article)
+        # print(test.data)
         return Response(serializer.data)
 
     def get(self, request, *args, **kwargs):
@@ -70,8 +73,13 @@ class ArticleDetail(generics.GenericAPIView,
 # Show list of comments on an article
 class CommentList(generics.GenericAPIView,
                   mixins.ListModelMixin):
-    queryset = Comment.objects.all()
+    # queryset = Comment.objects.all()
     serializer_class = CommentSerializer
+
+    def get_queryset(self, article=None):
+        if article is None:
+            return Comment.objects.all()
+        return Comment.objects.filter(article=article)
 
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)

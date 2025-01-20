@@ -13,29 +13,31 @@ class ArticleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Article
-        fields = '__all__'
+        exclude = ['created_at', 'status']
 
 
 class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = '__all__'
+        # fields = '__all__'
+        # exclude = ['created_at', 'status']
+        exclude = ['created_at', 'status', 'article']
+
+
+class SmallCommentSerializer(serializers.ModelSerializer):
+    tags = TagSerializer(many=True)
+
+    class Meta:
+        model = Article
+        fields = ['id', 'title', 'tags', 'author', 'image', 'created_at']
 
 
 class ArticleWithCommentsSerializer(serializers.ModelSerializer):
-    # title = serializers.CharField(max_length=200)
-    # text = serializers.CharField()
-    # author = serializers.CharField(max_length=100)
-    # tags = TagSerializer(many=True)
-    # image = serializers.ImageField(allow_null=True, allow_empty_file=True)
-    # status = serializers.CharField()
-    # created_at = serializers.DateTimeField()
-    # updated_at = serializers.DateTimeField()
     comments = CommentSerializer(many=True)
 
     class Meta:
         model = Article
-        fields = '__all__'
+        exclude = ['created_at', 'status', ]
 
 
 class ArticleCreationSerializer(serializers.ModelSerializer):
