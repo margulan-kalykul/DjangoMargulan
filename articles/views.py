@@ -7,7 +7,7 @@ from rest_framework.response import Response
 
 from .models import Article, Comment
 from .filters import ArticleFilter
-from .serializers import ArticleSerializer, ArticleCreationSerializer, CommentSerializer
+from .serializers import ArticleSerializer, ArticleCreationSerializer, CommentSerializer, ArticleWithCommentsSerializer
 
 
 # Form to create a new article and list of all articles
@@ -46,6 +46,11 @@ class ArticleDetail(generics.GenericAPIView,
             return get_object_or_404(Article, pk=pk)
         except Http404:
             raise Http404
+        
+    def retrieve(self, request, *args, **kwargs):
+        article = self.get_object()
+        serializer = ArticleWithCommentsSerializer(article)
+        return Response(serializer.data)
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -65,7 +70,7 @@ class ArticleDetail(generics.GenericAPIView,
 # Show list of comments on an article
 class CommentList(generics.GenericAPIView,
                   mixins.ListModelMixin):
-    queryset = Comment.objects.select_related('article').all()
+    queryset = Comment.objects.all()
     serializer_class = CommentSerializer
 
     def get(self, request, *args, **kwargs):
@@ -83,7 +88,7 @@ class CommentList(generics.GenericAPIView,
 class CommentDetails(generics.GenericAPIView,
                      mixins.RetrieveModelMixin,
                      mixins.DestroyModelMixin):
-    queryset = Comment.objects.select_related('article').all()
+    queryset = Comment.objects.all()
     serializer_class = CommentSerializer
     # filter_backends = [DjangoFilterBackend]
     # filterset_class = ArticleFilter
