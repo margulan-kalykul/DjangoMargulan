@@ -86,7 +86,7 @@ def update_article(request, pk):
             },
         )
 
-
+# TODO: Finish the rest of views and make chache ignored
 # Delete given article
 @api_view(['DELETE'])
 def delete_article(request, pk):
@@ -103,4 +103,4 @@ def delete_article(request, pk):
 @api_view(['DELETE'])
 def delete_articles(request):
     Article.objects.all().delete()
-    return Response({"message": "All articles are deleted"})
+    return Response({"message": "All articles are deleted"}, status=status.HTTP_204_NO_CONTENT)
