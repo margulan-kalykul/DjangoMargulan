@@ -1,4 +1,4 @@
-from django.http import Http404
+from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, generics, mixins
@@ -7,15 +7,15 @@ from rest_framework.response import Response
 
 from .models import Article, Comment
 from .filters import ArticleFilter
-from .serializers import ArticleSerializer, ArticleCreationSerializer, CommentSerializer, SmallCommentSerializer, \
-    ArticleWithCommentsSerializer
+from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, CommentListSerializer, ArticleListSerializer, \
+    ArticleWithCommentsSerializer, CommentCreateSerializer
 
 
 # Form to create a new article and list of all articles
 class ArticlesList(generics.GenericAPIView,
                    mixins.ListModelMixin):
     queryset = Article.objects.prefetch_related('tags').all()
-    serializer_class = SmallCommentSerializer
+    serializer_class = ArticleListSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = ArticleFilter
 
@@ -38,7 +38,7 @@ class ArticleDetail(generics.GenericAPIView,
                     mixins.RetrieveModelMixin,
                     mixins.DestroyModelMixin):
     queryset = Article.objects.prefetch_related('tags').all()
-    serializer_class = ArticleSerializer
+    serializer_class = ArticleDetailsSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = ArticleFilter
 
@@ -48,12 +48,12 @@ class ArticleDetail(generics.GenericAPIView,
         except Http404:
             raise Http404
         
-    def retrieve(self, request, *args, **kwargs):
-        article = self.get_object()
-        serializer = ArticleWithCommentsSerializer(article)  # SmallCommentSerializer(article)
-        # test = SmallCommentSerializer(article)
-        # print(test.data)
-        return Response(serializer.data)
+    # def retrieve(self, request, *args, **kwargs):
+    #     article = self.get_object()
+    #     serializer = ArticleDetailsSerializer(article)  # SmallCommentSerializer(article)
+    #     # test = SmallCommentSerializer(article)
+    #     # print(test.data)
+    #     return Response(serializer.data)
 
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -73,19 +73,26 @@ class ArticleDetail(generics.GenericAPIView,
 # Show list of comments on an article
 class CommentList(generics.GenericAPIView,
                   mixins.ListModelMixin):
-    # queryset = Comment.objects.all()
-    serializer_class = CommentSerializer
+    queryset = Comment.objects.all()
+    serializer_class = CommentListSerializer
 
-    def get_queryset(self, article=None):
-        if article is None:
-            return Comment.objects.all()
-        return Comment.objects.filter(article=article)
+    # def set_comments(self, pk):
+    #     """
+    #     Sets the queryset to needed comments
+    #     """
+    #     self.queryset = Comment.objects.filter(article_id=pk)
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request, pk, *args, **kwargs):
+        self.queryset = self.queryset.filter(article_id=pk)
         return self.list(request, *args, **kwargs)
 
-    def post(self, request):
-        serializer = CommentSerializer(data=request.data)
+    # TODO: Deal with the problem with 'article_id' and 'article'. 
+    # When changing data['article'] = pk to data['article_id'] = pk data includes both of them and doesn't work properly.
+    def post(self, request, pk):
+        data = request.data.copy()
+        data['article'] = pk
+        print(data)
+        serializer = CommentCreateSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -97,7 +104,7 @@ class CommentDetails(generics.GenericAPIView,
                      mixins.RetrieveModelMixin,
                      mixins.DestroyModelMixin):
     queryset = Comment.objects.all()
-    serializer_class = CommentSerializer
+    serializer_class = CommentListSerializer
     # filter_backends = [DjangoFilterBackend]
     # filterset_class = ArticleFilter
 
@@ -108,11 +115,16 @@ class CommentDetails(generics.GenericAPIView,
             raise Http404
 
     def get(self, request, *args, **kwargs):
+    # def get(self, request, apk, cpk):
+        print(self.get_object())
+        # return Response(self.get_comment(pk=cpk))
         return self.retrieve(request, *args, **kwargs)
 
     def put(self, request, pk):
         comment = self.get_comment(pk=pk)
-        serializer = CommentSerializer(comment, data=request.data)
+        # data = request.data.copy()
+        # data['pk'] = cpk
+        serializer = CommentListSerializer(comment, data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)

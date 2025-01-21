@@ -24,7 +24,8 @@ from debug_toolbar.toolbar import debug_toolbar_urls
 urlpatterns = [
     path('articles/', views.ArticlesList.as_view(), name="articles"),
     path('articles/<int:pk>/', views.ArticleDetail.as_view(), name="article"),
-    path('comments/', views.CommentList.as_view(), name="comments"),
+    path('articles/<int:pk>/comments/', views.CommentList.as_view(), name="comments"),
+    # path('articles/<apk>/comments/<cpk>/', views.CommentDetails.as_view(), name="comment"),
     path('comments/<int:pk>/', views.CommentDetails.as_view(), name="comment"),
     path('admin/', admin.site.urls),
     path('rest/', include('rest_framework.urls')),

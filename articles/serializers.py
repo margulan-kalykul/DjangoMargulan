@@ -8,7 +8,7 @@ class TagSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class ArticleSerializer(serializers.ModelSerializer):
+class ArticleDetailsSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True)
 
     class Meta:
@@ -16,15 +16,22 @@ class ArticleSerializer(serializers.ModelSerializer):
         exclude = ['created_at', 'status']
 
 
-class CommentSerializer(serializers.ModelSerializer):
+class CommentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        # fields = '__all__'
         # exclude = ['created_at', 'status']
-        exclude = ['created_at', 'status', 'article']
+        fields = ['author', 'text', 'updated_at', 'article']
+        read_only = fields
 
 
-class SmallCommentSerializer(serializers.ModelSerializer):
+class CommentCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        # exclude = ['created_at', 'status']
+        fields = ['author', 'text', 'article']
+
+
+class ArticleListSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True)
 
     class Meta:
@@ -33,7 +40,7 @@ class SmallCommentSerializer(serializers.ModelSerializer):
 
 
 class ArticleWithCommentsSerializer(serializers.ModelSerializer):
-    comments = CommentSerializer(many=True)
+    comments = CommentListSerializer(many=True)
 
     class Meta:
         model = Article
