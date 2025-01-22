@@ -17,12 +17,24 @@ class CommentListSerializer(serializers.ModelSerializer):
         # extra_kwargs = {'password': {'read_only': True}}
 
 
+class CommentDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['author', 'text', 'updated_at']
+
+
 class CommentCreateSerializer(serializers.ModelSerializer):
     # article_id = serializers.IntegerField()
     class Meta:
         model = Comment
         # exclude = ['created_at', 'status']
         fields = ['author', 'text', 'article']
+
+
+class CommentUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['text']
 
 
 class ArticleDetailsSerializer(serializers.ModelSerializer):
