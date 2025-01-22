@@ -14,64 +14,72 @@ from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, Co
     CommentUpdateSerializer
 
 
-class ArticleViewSet(viewsets.ModelViewSet):
+class ArticleViewSet(mixins.ListModelMixin,
+                     mixins.CreateModelMixin,
+                     mixins.UpdateModelMixin,
+                     mixins.RetrieveModelMixin,
+                     viewsets.GenericViewSet):
     # Base serializer class
     serializer_class = ArticleListSerializer
-    queryset = Article.objects.all()
+    # queryset = Article.objects.all()
+
+    def get_queryset(self):
+        queryset = Article.objects.prefetch_related('tags').all()
+        if self.action == 'list':
+            queryset = queryset.defer('text')
+        return queryset
 
     def get_serializer_class(self):
         match self.action:
             case 'list':
-                self.serializer_class = ArticleListSerializer
+                return ArticleListSerializer
             case 'create':
-                self.serializer_class = ArticleCreationSerializer
+                return ArticleCreationSerializer
             case 'retrieve':
-                self.serializer_class = ArticleDetailsSerializer
-            case 'update':
-                self.serializer_class = ArticleUpdateSerializer
-            case 'partial_update':
-                self.serializer_class = ArticleUpdateSerializer
-            case 'destroy':
-                self.serializer_class = ArticleDetailsSerializer
-        return super().get_serializer_class()
+                return ArticleDetailsSerializer
+            case 'update' | 'partial_update':
+                return ArticleUpdateSerializer
+            case _:
+                return ArticleListSerializer
 
     # def list(self, request, *args, **kwargs):
     #     # print(self.get_queryset())
-    #     self.serializer_class = ArticleListSerializer
+    #     return ArticleListSerializer
     #     response = super().list(request, *args, **kwargs)
     #     # Set the base serializer class to the one used in the create method
-    #     # self.serializer_class = ArticleCreationSerializer
+    #     # return ArticleCreationSerializer
     #     return response
 
     # def create(self, request, *args, **kwargs):
-    #     self.serializer_class = ArticleCreationSerializer
+    #     return ArticleCreationSerializer
     #     return super().create(request, *args, **kwargs)
     
     # def retrieve(self, request, *args, **kwargs):
     #     # print(self.action)
-    #     self.serializer_class = ArticleDetailsSerializer
+    #     return ArticleDetailsSerializer
     #     response = super().retrieve(request, *args, **kwargs)
     #     # Set the base serializer class to the one used in the update and partial_update methods
-    #     # self.serializer_class = ArticleUpdateSerializer
+    #     # return ArticleUpdateSerializer
     #     return response
     
     # def update(self, request, *args, **kwargs):
-    #     self.serializer_class = ArticleUpdateSerializer
+    #     return ArticleUpdateSerializer
     #     return super().update(request, *args, **kwargs)
     
     # def partial_update(self, request, *args, **kwargs):
-    #     self.serializer_class = ArticleUpdateSerializer
+    #     return ArticleUpdateSerializer
     #     return super().partial_update(request, *args, **kwargs)
     
     # def destroy(self, request, *args, **kwargs):
-    #     self.serializer_class = ArticleDetailsSerializer
+    #     return ArticleDetailsSerializer
     #     return super().destroy(request, *args, **kwargs)
     
 
 class CommentViewSet(viewsets.ModelViewSet):
+
     # Base serializer class
-    serializer_class = CommentListSerializer
-    queryset = Comment.objects.all()
+    # serializer_class = CommentListSerializer
+    # queryset = Comment.objects.all()
 
     def get_queryset(self):
         article_id = self.kwargs.get('articles_pk')
@@ -80,50 +88,51 @@ class CommentViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         match self.action:
             case 'list':
-                self.serializer_class = CommentListSerializer
+                return CommentListSerializer
             case 'create':
-                self.serializer_class = CommentCreateSerializer
+                return CommentCreateSerializer
             case 'retrieve':
-                self.serializer_class = CommentDetailsSerializer
+                return CommentDetailsSerializer
             case 'update':
-                self.serializer_class = CommentUpdateSerializer
+                return CommentUpdateSerializer
             case 'partial_update':
-                self.serializer_class = CommentUpdateSerializer
+                return CommentUpdateSerializer
             case 'destroy':
-                self.serializer_class = CommentDetailsSerializer
-        return super().get_serializer_class()
+                return CommentDetailsSerializer
+            case _:
+                return CommentListSerializer
 
     # def list(self, request, *args, **kwargs):
-    #     self.serializer_class = CommentListSerializer
+    #     return CommentListSerializer
     #     # r: Request = request
     #     # print(self.get_queryset())
     #     # self.queryset = Comment.objects.filter(article_id=kwargs['article'])
     #     response = super().list(request, *args, **kwargs)
     #     # Set the base serializer class to the one used in the create method
-    #     # self.serializer_class = CommentCreateSerializer
+    #     # return CommentCreateSerializer
     #     return response
 
     # def create(self, request, *args, **kwargs):
-    #     self.serializer_class = CommentCreateSerializer
+    #     return CommentCreateSerializer
     #     return super().create(request, *args, **kwargs)
     
     # def retrieve(self, request, *args, **kwargs):
-    #     self.serializer_class = CommentDetailsSerializer
+    #     return CommentDetailsSerializer
     #     response = super().retrieve(request, *args, **kwargs)
     #     # Set the base serializer class to the one used in the update and partial_update methods
-    #     # self.serializer_class = CommentUpdateSerializer
+    #     # return CommentUpdateSerializer
     #     return response
     
     # def update(self, request, *args, **kwargs):
-    #     self.serializer_class = CommentUpdateSerializer
+    #     return CommentUpdateSerializer
     #     return super().update(request, *args, **kwargs)
     
     # def partial_update(self, request, *args, **kwargs):
-    #     self.serializer_class = CommentUpdateSerializer
+    #     return CommentUpdateSerializer
     #     return super().partial_update(request, *args, **kwargs)
     
     # def destroy(self, request, *args, **kwargs):
-    #     self.serializer_class = CommentDetailsSerializer
+    #     return CommentDetailsSerializer
     #     return super().destroy(request, *args, **kwargs)
 
 
