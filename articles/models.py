@@ -27,9 +27,9 @@ class Article(models.Model):
 
 
 class Status(models.TextChoices):
-        NEW = "NEW"
-        ACCEPTED = "ACCEPTED"
-        REJECTED = "REJECTED"
+    NEW = "NEW"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
 
 
 class Comment(models.Model):

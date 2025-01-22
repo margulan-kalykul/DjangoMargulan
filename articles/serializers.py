@@ -8,27 +8,29 @@ class TagSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class CommentListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        # exclude = ['created_at', 'status']
+        fields = ['id', 'author', 'text', 'updated_at']
+        read_only = fields
+        # extra_kwargs = {'password': {'read_only': True}}
+
+
+class CommentCreateSerializer(serializers.ModelSerializer):
+    # article_id = serializers.IntegerField()
+    class Meta:
+        model = Comment
+        # exclude = ['created_at', 'status']
+        fields = ['author', 'text', 'article']
+
+
 class ArticleDetailsSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True)
 
     class Meta:
         model = Article
         exclude = ['created_at', 'status']
-
-
-class CommentListSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Comment
-        # exclude = ['created_at', 'status']
-        fields = ['author', 'text', 'updated_at', 'article']
-        read_only = fields
-
-
-class CommentCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Comment
-        # exclude = ['created_at', 'status']
-        fields = ['author', 'text', 'article']
 
 
 class ArticleListSerializer(serializers.ModelSerializer):
@@ -57,3 +59,11 @@ class ArticleCreationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Article
         fields = ['title', 'tags', 'author', 'text', 'image']
+
+
+class ArticleUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Article
+        fields = ['title', 'tags', 'text', 'image']
+        # extra_kwargs = {'tags': {'required': False}, 'title': {'required': False}}
+

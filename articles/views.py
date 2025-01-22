@@ -1,14 +1,86 @@
 from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, generics, mixins
+from rest_framework import status, generics, mixins, viewsets
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from .models import Article, Comment
 from .filters import ArticleFilter
 from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, CommentListSerializer, ArticleListSerializer, \
-    ArticleWithCommentsSerializer, CommentCreateSerializer
+    ArticleWithCommentsSerializer, CommentCreateSerializer, ArticleUpdateSerializer
+
+
+# class ArticleViewSet(viewsets.ModelViewSet):
+#     # Base serializer class
+#     serializer_class = ArticleListSerializer
+#     queryset = Article.objects.all()
+
+#     def list(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleListSerializer
+#         response = super().list(request, *args, **kwargs)
+#         # Set the base serializer class to the one used in the create method
+#         self.serializer_class = ArticleCreationSerializer
+#         return response
+
+#     def create(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleCreationSerializer
+#         return super().create(request, *args, **kwargs)
+    
+#     def retrieve(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleDetailsSerializer
+#         response = super().retrieve(request, *args, **kwargs)
+#         # Set the base serializer class to the one used in the update and partial_update methods
+#         self.serializer_class = ArticleUpdateSerializer
+#         return response
+    
+#     def update(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleUpdateSerializer
+#         return super().update(request, *args, **kwargs)
+    
+#     def partial_update(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleUpdateSerializer
+#         return super().partial_update(request, *args, **kwargs)
+    
+#     def destroy(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleDetailsSerializer
+#         return super().destroy(request, *args, **kwargs)
+    
+
+# class CommentViewSet(viewsets.ModelViewSet):
+#     # Base serializer class
+#     serializer_class = CommentListSerializer
+#     queryset = Comment.objects.all()
+
+#     def list(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleListSerializer
+#         response = super().list(request, *args, **kwargs)
+#         # Set the base serializer class to the one used in the create method
+#         self.serializer_class = ArticleCreationSerializer
+#         return response
+
+#     def create(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleCreationSerializer
+#         return super().create(request, *args, **kwargs)
+    
+#     def retrieve(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleDetailsSerializer
+#         response = super().retrieve(request, *args, **kwargs)
+#         # Set the base serializer class to the one used in the update and partial_update methods
+#         self.serializer_class = ArticleUpdateSerializer
+#         return response
+    
+#     def update(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleUpdateSerializer
+#         return super().update(request, *args, **kwargs)
+    
+#     def partial_update(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleUpdateSerializer
+#         return super().partial_update(request, *args, **kwargs)
+    
+#     def destroy(self, request, *args, **kwargs):
+#         self.serializer_class = ArticleDetailsSerializer
+#         return super().destroy(request, *args, **kwargs)
 
 
 # Form to create a new article and list of all articles
@@ -58,13 +130,22 @@ class ArticleDetail(generics.GenericAPIView,
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
     
-    def put(self, request, pk):
-        article = self.get_article(pk=pk)
-        serializer = ArticleCreationSerializer(article, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_404_NOT_FOUND)
+    def put(self, request, article_id):
+        article = self.get_article(pk=article_id)
+        serializer = ArticleUpdateSerializer(article, data=request.data)
+        # serializer = ArticleCreationSerializer(article, data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            article=serializer.save()
+            updated_serializer = ArticleDetailsSerializer(article)
+            return Response(updated_serializer.data)
+    
+    def patch(self, request, article_id):
+        article = self.get_article(pk=article_id)
+        serializer = ArticleUpdateSerializer(article, data=request.data, partial=True)
+        if serializer.is_valid(raise_exception=True):
+            article = serializer.save()
+            updated_serializer = ArticleDetailsSerializer(article)
+            return Response(updated_serializer.data)
     
     def delete(self, request, *args, **kwargs):
         return self.destroy(self, request, *args, **kwargs)
@@ -76,27 +157,20 @@ class CommentList(generics.GenericAPIView,
     queryset = Comment.objects.all()
     serializer_class = CommentListSerializer
 
-    # def set_comments(self, pk):
-    #     """
-    #     Sets the queryset to needed comments
-    #     """
-    #     self.queryset = Comment.objects.filter(article_id=pk)
-
-    def get(self, request, pk, *args, **kwargs):
-        self.queryset = self.queryset.filter(article_id=pk)
+    def get(self, request, *args, **kwargs):
+        article_id = kwargs['article_id']
+        self.queryset = self.queryset.filter(article_id=article_id)
         return self.list(request, *args, **kwargs)
 
-    # TODO: Deal with the problem with 'article_id' and 'article'. 
-    # When changing data['article'] = pk to data['article_id'] = pk data includes both of them and doesn't work properly.
-    def post(self, request, pk):
-        data = request.data.copy()
-        data['article'] = pk
-        print(data)
-        serializer = CommentCreateSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request, *args, **kwargs):
+        article_id = kwargs['article_id']
+        request.data.update( {'article': article_id} )
+        serializer = CommentCreateSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            new_comment = serializer.save()
+            new_serializer = CommentListSerializer(new_comment)
+            print(new_serializer.data)
+            return Response(new_serializer.data, status=status.HTTP_201_CREATED)
 
 
 # Show specific comment
@@ -107,28 +181,39 @@ class CommentDetails(generics.GenericAPIView,
     serializer_class = CommentListSerializer
     # filter_backends = [DjangoFilterBackend]
     # filterset_class = ArticleFilter
+    lookup_field = 'id'
+    lookup_url_kwarg = "comment_id"
 
     def get_comment(self, pk):
         try:
             return get_object_or_404(Comment, pk=pk)
         except Http404:
             raise Http404
+        
+    def get_queryset(self):
+        article_id = self.kwargs['article_id']
+        return Comment.objects.filter(article_id=article_id)
 
-    def get(self, request, *args, **kwargs):
-    # def get(self, request, apk, cpk):
-        print(self.get_object())
-        # return Response(self.get_comment(pk=cpk))
+    def get(self, request, article_id, comment_id, *args, **kwargs):
+        self.queryset = Comment.objects.filter(article_id=article_id)
         return self.retrieve(request, *args, **kwargs)
 
-    def put(self, request, pk):
-        comment = self.get_comment(pk=pk)
-        # data = request.data.copy()
-        # data['pk'] = cpk
+    def put(self, request, article_id, comment_id):
+        comment = self.get_comment(pk=comment_id)
         serializer = CommentListSerializer(comment, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if serializer.is_valid(raise_exception=True):
+            updated_comment = serializer.save()
+            updated_serializer = CommentListSerializer(updated_comment)
+            print(updated_serializer.data)
+            return Response(updated_serializer.data)
+        
+    def patch(self, request, article_id, comment_id):
+        comment = self.get_comment(pk=comment_id)
+        serializer = CommentListSerializer(comment, data=request.data, partial=True)
+        if serializer.is_valid(raise_exception=True):
+            comment = serializer.save()
+            updated_serializer = CommentListSerializer(comment)
+            return Response(updated_serializer.data)
     
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
