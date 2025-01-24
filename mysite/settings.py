@@ -65,6 +65,7 @@ MIDDLEWARE = [
 REST_FRAMEWORK = {
     # YOUR SETTINGS
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    
 }
 
 SPECTACULAR_SETTINGS = {
@@ -73,6 +74,8 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     # OTHER SETTINGS
+    # This splits components into request and response parts, which allows files to be uploaded in swagger ui
+    'COMPONENT_SPLIT_REQUEST': True,
 }
 
 INTERNAL_IPS = [

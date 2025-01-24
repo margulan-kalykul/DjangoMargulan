@@ -1,3 +1,5 @@
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import Article, Tag, Comment, Status
 
@@ -62,20 +64,27 @@ class ArticleWithCommentsSerializer(serializers.ModelSerializer):
 
 
 class ArticleCreationSerializer(serializers.ModelSerializer):
-    # tags = serializers.ListField
-
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     self.fields["tags"].choices = [tag.id for tag in Tag.objects.all()]
+    tags = serializers.ListField(child=serializers.IntegerField())
 
     class Meta:
         model = Article
-        fields = ['title', 'tags', 'author', 'text', 'image']
+        fields = ['title', 'tags', 'author', 'text']
 
 
+# @extend_schema_field(serializers.ImageField)
+# class ImageCustomField(serializers.Field):
+#     def to_representation(self, value):
+#         return urlsafe_base64_encode()
 class ArticleUpdateSerializer(serializers.ModelSerializer):
+    # @extend_schema_field(OpenApiTypes.BINARY)  # Explicitly mark as file upload
+    # def get_image(self, obj):
+    #     return obj.image
+    
     class Meta:
         model = Article
-        fields = ['title', 'tags', 'text', 'image']
+        fields = ['title', 'tags', 'text']
         # extra_kwargs = {'tags': {'required': False}, 'title': {'required': False}}
 
+
+class ImageUploadSerializer(serializers.Serializer):
+    image = serializers.ImageField()

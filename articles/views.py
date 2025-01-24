@@ -3,8 +3,10 @@ from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, extend_schema_view
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, extend_schema_view, \
+    PolymorphicProxySerializer, inline_serializer
 from rest_framework import status, generics, mixins, viewsets
+from rest_framework.decorators import action
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser, FileUploadParser
 from rest_framework.response import Response
 from rest_framework.request import Request
@@ -14,7 +16,7 @@ from .filters import ArticleFilter
 from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, CommentListSerializer, \
     ArticleListSerializer, \
     ArticleWithCommentsSerializer, CommentCreateSerializer, ArticleUpdateSerializer, CommentDetailsSerializer, \
-    CommentUpdateSerializer, TagSerializer
+    CommentUpdateSerializer, TagSerializer, ImageUploadSerializer
 
 
 @extend_schema_view(
@@ -50,7 +52,6 @@ from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, Co
         description='Create new article. Must have "multipart/form-data" as the encoding type.',
         responses={201: ArticleDetailsSerializer}
     ),
-
 )
 class ArticleViewSet(mixins.ListModelMixin,
                      mixins.CreateModelMixin,
@@ -62,7 +63,7 @@ class ArticleViewSet(mixins.ListModelMixin,
     # queryset = Article.objects.all()
     filter_backends = [DjangoFilterBackend]
     filterset_class = ArticleFilter
-    parser_classes = [FileUploadParser, MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, JSONParser, FormParser]
 
     def get_queryset(self):
         queryset = Article.objects.prefetch_related('tags').all()
@@ -80,8 +81,26 @@ class ArticleViewSet(mixins.ListModelMixin,
                 return ArticleDetailsSerializer
             case 'update' | 'partial_update':
                 return ArticleUpdateSerializer
+            case 'upload_image':
+                return ImageUploadSerializer
             case _:
                 return ArticleListSerializer
+            
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        new_serializer = ArticleDetailsSerializer(instance)
+        return Response(new_serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['put'])
+    def upload_image(self, request, pk=None):
+        article = self.get_object()
+        serializer = ImageUploadSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            article.image = serializer.validated_data['image']
+            article.save()
+            return Response({'status': 'image uploaded'})
     
 
 # Resolves warning for the articles_pk parameter generated in the path by the NestedDefaultRouter
@@ -135,7 +154,4 @@ class CommentViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         request.data['article'] = int(self.kwargs.get('articles_pk'))
-        return super().create(request, *args, **kwargs)
-    
-    #TODO: use request.FILES to make file upload in swagger work
-        
+        return super().create(request, *args, **kwargs)        

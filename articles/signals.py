@@ -32,7 +32,7 @@ def chatgpt_check(sender, instance, created, **kwargs):
             },
         )
         chat = openai.ChatCompletion.create(
-            model="gpt-4o-mini", messages=messages
+            model="gpt-3.5-turbo", messages=messages
         )
     answer: str = chat.choices[0].message.content
     print(answer)
