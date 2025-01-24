@@ -9,8 +9,8 @@ class ArticleFilter(django_filters.FilterSet):
 
     # Choose what tags the articles should have
     tags = django_filters.ModelMultipleChoiceFilter(
-        field_name='tags__name', 
-        to_field_name='name',
+        field_name='tags__id',
+        to_field_name='id',
         queryset=Tag.objects.all(),
         widget=forms.CheckboxSelectMultiple,
         conjoined=True,
