@@ -19,6 +19,7 @@ from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, Co
     CommentUpdateSerializer, TagSerializer, ImageUploadSerializer
 
 
+# TODO: Celery or RabbitMQ will be added
 @extend_schema_view(
     list=extend_schema(
         parameters=[
@@ -63,7 +64,7 @@ class ArticleViewSet(mixins.ListModelMixin,
     # queryset = Article.objects.all()
     filter_backends = [DjangoFilterBackend]
     filterset_class = ArticleFilter
-    parser_classes = [MultiPartParser, JSONParser, FormParser]
+    # parser_classes = [MultiPartParser, JSONParser, FormParser]
 
     def get_queryset(self):
         queryset = Article.objects.prefetch_related('tags').all()
@@ -93,14 +94,14 @@ class ArticleViewSet(mixins.ListModelMixin,
         new_serializer = ArticleDetailsSerializer(instance)
         return Response(new_serializer.data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=['put'])
+    @action(detail=True, methods=['put'], parser_classes=[MultiPartParser])
     def upload_image(self, request, pk=None):
         article = self.get_object()
         serializer = ImageUploadSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            article.image = serializer.validated_data['image']
-            article.save()
-            return Response({'status': 'image uploaded'})
+        serializer.is_valid(raise_exception=True)
+        article.image = serializer.validated_data['image']
+        article.save()
+        return Response({'status': 'image uploaded'})
     
 
 # Resolves warning for the articles_pk parameter generated in the path by the NestedDefaultRouter
