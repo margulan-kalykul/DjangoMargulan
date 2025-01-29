@@ -10,5 +10,5 @@ class ArticlesConfig(AppConfig):
         # Implicitly connect signal handlers decorated with @receiver.
         from . import signals
 
-        # Explicitly connect a signal handler.
-        # post_save.connect(signals.my_callback)
+        # Explicitly connect a signal handler and pass unique identifier.
+        # post_save.connect(chatgpt_check, dispatch_uid="check_text")

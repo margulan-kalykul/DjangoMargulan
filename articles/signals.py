@@ -11,9 +11,10 @@ messages = [{"role": "system", "content": "You are a intelligent assistant."}]
 
 @receiver(post_save, sender=Article)
 def chatgpt_check(sender, instance, created, **kwargs):
-    print("Received")
-    if not created:
+    if instance.status != Article.Status.NEW:
         return
+    # if not created:
+    #     return
     text = instance.text
     article_id = instance.id
     query = f"""
@@ -47,3 +48,4 @@ def chatgpt_check(sender, instance, created, **kwargs):
         rejected_article.save()
     else:
         print(answer)
+    print("Checked")

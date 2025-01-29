@@ -17,6 +17,8 @@ from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, Co
     ArticleListSerializer, \
     ArticleWithCommentsSerializer, CommentCreateSerializer, ArticleUpdateSerializer, CommentDetailsSerializer, \
     CommentUpdateSerializer, TagSerializer, ImageUploadSerializer
+from .tasks import update_article
+import random
 
 
 # TODO: Celery or RabbitMQ will be added
@@ -86,6 +88,14 @@ class ArticleViewSet(mixins.ListModelMixin,
                 return ImageUploadSerializer
             case _:
                 return ArticleListSerializer
+            
+    def partial_update(self, request, *args, **kwargs):
+        update_article.delay(self.kwargs['pk'], request.data, partial=True)
+        return Response({"message": "updating"})
+    
+    def update(self, request, *args, **kwargs):
+        update_article.delay(self.kwargs['pk'], request.data, partial=False)
+        return Response({"message": "updating"})
             
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
