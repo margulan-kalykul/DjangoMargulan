@@ -17,11 +17,9 @@ from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, Co
     ArticleListSerializer, \
     ArticleWithCommentsSerializer, CommentCreateSerializer, ArticleUpdateSerializer, CommentDetailsSerializer, \
     CommentUpdateSerializer, TagSerializer, ImageUploadSerializer
-from .tasks import update_article
-import random
+from .tasks import update_article, create_article, check_text
 
 
-# TODO: Celery or RabbitMQ will be added
 @extend_schema_view(
     list=extend_schema(
         parameters=[
@@ -52,7 +50,7 @@ import random
         responses={200: ArticleListSerializer}
     ),
     create=extend_schema(
-        description='Create new article. Must have "multipart/form-data" as the encoding type.',
+        description='Create new article.',
         responses={201: ArticleDetailsSerializer}
     ),
 )
@@ -88,20 +86,36 @@ class ArticleViewSet(mixins.ListModelMixin,
                 return ImageUploadSerializer
             case _:
                 return ArticleListSerializer
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        print(queryset.query)
+        return super().list(request, *args, **kwargs)
             
     def partial_update(self, request, *args, **kwargs):
-        update_article.delay(self.kwargs['pk'], request.data, partial=True)
-        return Response({"message": "updating"})
+        instance = self.get_object()
+        instance.status = Article.Status.NEW
+        serializer = ArticleUpdateSerializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        check_text.delay(instance.id)
+        return Response(serializer.data)
     
     def update(self, request, *args, **kwargs):
-        update_article.delay(self.kwargs['pk'], request.data, partial=False)
-        return Response({"message": "updating"})
+        instance = self.get_object()
+        serializer = ArticleUpdateSerializer(instance, data=request.data, partial=False)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        check_text.delay(instance.id)
+        return Response(serializer.data)
             
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        print(request.data)
+        serializer = ArticleCreationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
+        check_text.delay(instance.id)
         new_serializer = ArticleDetailsSerializer(instance)
+        # print(new_serializer.data)
         return Response(new_serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['put'], parser_classes=[MultiPartParser])

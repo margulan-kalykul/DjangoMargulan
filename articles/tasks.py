@@ -5,32 +5,51 @@ from celery import shared_task
 from .serializers import ImageUploadSerializer, ArticleUpdateSerializer, ArticleCreationSerializer
 from django.core.files.uploadedfile import InMemoryUploadedFile
 import time
+from .secret_keys import OPENAI_API
+import openai
 
 @shared_task
-def add(x, y):
-    return x + y
+def check_text(article_id):
+    article = Article.objects.get(pk=article_id)
+    text = article.text
+    query = f"""
+    Check the text provided if it contains any mentions of terrorism. If it does return this single string - 
+    "REJECTED" (without quotes).
+    If it does not then return single string - 
+    "ACCEPTED" (without quotes).
+    The text provided: 
+    {text}
+    """
+    openai.api_key = OPENAI_API
+    messages = [{"role": "system", "content": "You are a intelligent assistant."}]
+    if text:
+        messages.append(
+            {
+                "role": "user", 
+                "content": query,
+            },
+        )
+        chat = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo", messages=messages
+        )
+    answer: str = chat.choices[0].message.content
 
-@shared_task
-def mul(x, y):
-    return x * y
-
-
-@shared_task
-def xsum(numbers):
-    return sum(numbers)
+    if answer == Article.Status.ACCEPTED:
+        article.status = Article.Status.ACCEPTED
+    elif answer == Article.Status.REJECTED:
+        article.status = Article.Status.REJECTED
+    article.save(update_fields=['status', 'updated_at'])
 
 @shared_task
 def create_article(data):
     serializer = ArticleCreationSerializer(data=data)
     serializer.is_valid(raise_exception=True)
     instance = serializer.save()
-    return instance.id
+    check_text(instance.title + ".\n" + instance.text, instance.id)
+    return ArticleCreationSerializer(instance).data
 
-# TODO: Make a check by chatgpt in the task
 @shared_task
 def update_article(pk, data, partial):
-    # print("Started saving")
-    # time.sleep(15)
     instance = Article.objects.get(pk=pk)
     instance.status = Article.Status.NEW
     serializer = ArticleUpdateSerializer(instance, data=data, partial=partial)
@@ -41,4 +60,5 @@ def update_article(pk, data, partial):
         # If 'prefetch_related' has been applied to a queryset, we need to
         # forcibly invalidate the prefetch cache on the instance.
         instance._prefetched_objects_cache = {}
-    # print("Finished saving")
+    check_text(instance.title + ".\n" + instance.text, instance.id)
+    return ArticleUpdateSerializer(instance).data

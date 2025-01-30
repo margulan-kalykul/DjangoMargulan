@@ -13,7 +13,7 @@ class ArticleFilter(django_filters.FilterSet):
         to_field_name='id',
         queryset=Tag.objects.all(),
         widget=forms.CheckboxSelectMultiple,
-        conjoined=True,
+        # conjoined=True,
     )
     
     # Check the box to show only NEW and ACCEPTED articles
