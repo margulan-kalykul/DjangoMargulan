@@ -8,19 +8,38 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExampl
 from rest_framework import status, generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser, FileUploadParser
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.request import Request
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import Article, Comment
+from .models import Article, Comment, Author
 from .filters import ArticleFilter
 from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, CommentListSerializer, \
     ArticleListSerializer, \
     ArticleWithCommentsSerializer, CommentCreateSerializer, ArticleUpdateSerializer, CommentDetailsSerializer, \
-    CommentUpdateSerializer, TagSerializer, ImageUploadSerializer
+    CommentUpdateSerializer, TagSerializer, ImageUploadSerializer, AuthorSerializer, RegistrationSerializer
 from .tasks import check_text
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
 from django.db.models.query import QuerySet
+
+
+class LoginView(TokenObtainPairView):
+    permission_classes = [AllowAny, ]
+    serializer_class = TokenObtainPairSerializer
+
+
+class RegisterView(generics.CreateAPIView):
+    permission_classes = [AllowAny, ]
+    serializer_class = RegistrationSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 @extend_schema_view(

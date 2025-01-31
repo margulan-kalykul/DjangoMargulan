@@ -1,7 +1,8 @@
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from .models import Article, Tag, Comment, Status
+from .models import Article, Tag, Comment, Status, Author
+from django.contrib.auth.models import User
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -88,3 +89,31 @@ class ArticleUpdateSerializer(serializers.ModelSerializer):
 
 class ImageUploadSerializer(serializers.Serializer):
     image = serializers.ImageField()
+
+
+class AuthorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Author
+        fields = ['username', 'password']
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['username', 'password']
+
+
+class RegistrationSerializer(serializers.ModelSerializer):
+    # password = serializers.CharField(
+    #     max_length=128,
+    #     min_length=8,
+    #     write_only=True,
+    # )
+
+    class Meta:
+        model = User
+        fields = ['username', 'password']
+
+    def create(self, validated_data):
+        user = User.objects.create_user(**validated_data)
+        return user
