@@ -17,7 +17,10 @@ from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, Co
     ArticleListSerializer, \
     ArticleWithCommentsSerializer, CommentCreateSerializer, ArticleUpdateSerializer, CommentDetailsSerializer, \
     CommentUpdateSerializer, TagSerializer, ImageUploadSerializer
-from .tasks import update_article, create_article, check_text
+from .tasks import check_text
+from django.views.decorators.cache import cache_page
+from django.core.cache import cache
+from django.db.models.query import QuerySet
 
 
 @extend_schema_view(
@@ -71,6 +74,26 @@ class ArticleViewSet(mixins.ListModelMixin,
         if self.action == 'list':
             queryset = queryset.defer('text')
         return queryset
+    
+    def get_cached_articles(self) -> dict:
+        articles: dict = cache.get('articles')
+        if articles is None:
+            queryset = self.get_queryset()
+            articles: dict = {article.pk: article for article in queryset}
+            cache.set('articles', articles, timeout=60)
+        return articles
+    
+    def retrieve(self, request, *args, **kwargs):
+        article = self.get_cached_articles().get(int(self.kwargs['pk']))
+        serializer = ArticleDetailsSerializer(article)
+        # serializer.is_valid(raise_exception=True)
+        return Response(serializer.data)
+    
+    def list(self, request, *args, **kwargs):
+        articles = self.filter_queryset(list(self.get_cached_articles().values()))
+        serializer = ArticleListSerializer(articles, many=True)
+        # serializer.is_valid(raise_exception=True)
+        return Response(serializer.data)
 
     def get_serializer_class(self):
         match self.action:
@@ -86,10 +109,6 @@ class ArticleViewSet(mixins.ListModelMixin,
                 return ImageUploadSerializer
             case _:
                 return ArticleListSerializer
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        print(queryset.query)
-        return super().list(request, *args, **kwargs)
             
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()

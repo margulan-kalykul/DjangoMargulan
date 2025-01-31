@@ -35,6 +35,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    # 'django_celery_results',
     'debug_toolbar',
     'rest_framework',
     'django_filters',
@@ -47,6 +48,36 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'drf_spectacular',
 ]
+
+# CELERY_RESULT_BACKEND = 'django-cache'
+
+# CELERY_CACHE_BACKEND = 'default'
+
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+#         'LOCATION': 'my_cache_table',
+#     }
+# }
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://localhost:6379',
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            # You can configure connection pooling for better performance
+            # 'CONNECTION_POOL_KWARGS': {
+            #     'max_connections': 100,
+            #     'retry_on_timeout': True,
+            # },
+        }
+    }
+}
+
+# Optional: This is to ensure Django sessions are stored in Redis
+# SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+# SESSION_CACHE_ALIAS = 'default'
 
 MIDDLEWARE = [
     # Warning: The order of MIDDLEWARE is important. You should include the Debug Toolbar middleware as early 
