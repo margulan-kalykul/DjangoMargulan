@@ -8,7 +8,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExampl
 from rest_framework import status, generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser, FileUploadParser
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.request import Request
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -39,7 +39,7 @@ class RegisterView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response({"message": "User has registered"}, status=status.HTTP_201_CREATED)
 
 
 @extend_schema_view(
@@ -81,6 +81,7 @@ class ArticleViewSet(mixins.ListModelMixin,
                      mixins.UpdateModelMixin,
                      mixins.RetrieveModelMixin,
                      viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticatedOrReadOnly, ]
     # Base serializer class
     serializer_class = ArticleListSerializer
     # queryset = Article.objects.all()
@@ -94,22 +95,32 @@ class ArticleViewSet(mixins.ListModelMixin,
             queryset = queryset.defer('text')
         return queryset
     
-    def get_cached_articles(self) -> dict:
-        articles: dict = cache.get('articles')
-        if articles is None:
-            queryset = self.get_queryset()
-            articles: dict = {article.pk: article for article in queryset}
-            cache.set('articles', articles, timeout=60)
-        return articles
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if isinstance(obj, Article) and request.method not in ['GET', 'HEAD', 'OPTIONS'] and obj.author != request.user:
+            self.permission_denied(request)
+    
+    # Ineffective caching
+    # def get_object(self):
+    #     articles = cache.get('articles')
+    #     if articles is None:
+    #         self.queryset = self.get_queryset()
+    #         articles = {article.pk: article for article in self.queryset}
+    #         cache.set('articles', articles, timeout=60)
+    #         return super().get_object()
+    #     return articles.get(int(self.kwargs['pk']))
     
     def retrieve(self, request, *args, **kwargs):
-        article = self.get_cached_articles().get(int(self.kwargs['pk']))
+        # article = self.get_cached_articles().get(int(self.kwargs['pk']))
+        # Get object without caching
+        article = self.get_object()
         serializer = ArticleDetailsSerializer(article)
         # serializer.is_valid(raise_exception=True)
         return Response(serializer.data)
     
     def list(self, request, *args, **kwargs):
-        articles = self.filter_queryset(list(self.get_cached_articles().values()))
+        # Get a list without caching
+        articles = self.filter_queryset(self.get_queryset())
         serializer = ArticleListSerializer(articles, many=True)
         # serializer.is_valid(raise_exception=True)
         return Response(serializer.data)
@@ -129,6 +140,7 @@ class ArticleViewSet(mixins.ListModelMixin,
             case _:
                 return ArticleListSerializer
             
+    # TODO: Implement permissions for objects
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
         instance.status = Article.Status.NEW
@@ -147,7 +159,7 @@ class ArticleViewSet(mixins.ListModelMixin,
         return Response(serializer.data)
             
     def create(self, request, *args, **kwargs):
-        print(request.data)
+        request.data['author'] = request.user.id
         serializer = ArticleCreationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
@@ -193,6 +205,11 @@ class CommentViewSet(viewsets.ModelViewSet):
         article_id = self.kwargs.get('articles_pk')
         return Comment.objects.filter(article_id=article_id)
         # return Comment.objects.all()
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if isinstance(obj, Comment) and request.method not in ['GET', 'HEAD', 'OPTIONS'] and obj.author != request.user:
+            self.permission_denied(request)
 
     def get_serializer_class(self):
         match self.action:
