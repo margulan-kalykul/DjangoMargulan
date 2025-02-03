@@ -11,6 +11,12 @@ class TagSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+# class AuthorShowSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = User
+#         fields = ['id', 'username', ]
+
+
 class CommentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
@@ -50,6 +56,7 @@ class ArticleDetailsSerializer(serializers.ModelSerializer):
 
 class ArticleListSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True)
+    author = serializers.CharField()
 
     class Meta:
         model = Article
@@ -72,15 +79,7 @@ class ArticleCreationSerializer(serializers.ModelSerializer):
         fields = ['title', 'tags', 'author', 'text']
 
 
-# @extend_schema_field(serializers.ImageField)
-# class ImageCustomField(serializers.Field):
-#     def to_representation(self, value):
-#         return urlsafe_base64_encode()
-class ArticleUpdateSerializer(serializers.ModelSerializer):
-    # @extend_schema_field(OpenApiTypes.BINARY)  # Explicitly mark as file upload
-    # def get_image(self, obj):
-    #     return obj.image
-    
+class ArticleUpdateSerializer(serializers.ModelSerializer):    
     class Meta:
         model = Article
         fields = ['title', 'tags', 'text']
@@ -104,12 +103,6 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
-    # password = serializers.CharField(
-    #     max_length=128,
-    #     min_length=8,
-    #     write_only=True,
-    # )
-
     class Meta:
         model = User
         fields = ['username', 'password']

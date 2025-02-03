@@ -15,6 +15,8 @@ class ArticleFilter(django_filters.FilterSet):
         widget=forms.CheckboxSelectMultiple,
         # conjoined=True,
     )
+
+    author = django_filters.CharFilter(field_name='author__username', lookup_expr='icontains')
     
     # Check the box to show only NEW and ACCEPTED articles
     status_showable = django_filters.BooleanFilter(

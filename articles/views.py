@@ -9,10 +9,12 @@ from rest_framework import status, generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser, FileUploadParser
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
+from .permissions import AuthorshipPermission
 from rest_framework.response import Response
 from rest_framework.request import Request
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
+from django.contrib.auth.models import AnonymousUser
 
 from .models import Article, Comment, Author
 from .filters import ArticleFilter
@@ -81,7 +83,7 @@ class ArticleViewSet(mixins.ListModelMixin,
                      mixins.UpdateModelMixin,
                      mixins.RetrieveModelMixin,
                      viewsets.GenericViewSet):
-    permission_classes = [IsAuthenticatedOrReadOnly, ]
+    permission_classes = [IsAuthenticatedOrReadOnly, AuthorshipPermission, ]
     # Base serializer class
     serializer_class = ArticleListSerializer
     # queryset = Article.objects.all()
@@ -95,20 +97,36 @@ class ArticleViewSet(mixins.ListModelMixin,
             queryset = queryset.defer('text')
         return queryset
     
-    def check_object_permissions(self, request, obj):
-        super().check_object_permissions(request, obj)
-        if isinstance(obj, Article) and request.method not in ['GET', 'HEAD', 'OPTIONS'] and obj.author != request.user:
-            self.permission_denied(request)
+    # def check_object_permissions(self, request, obj):
+    #     super().check_object_permissions(request, obj)
+    #     if isinstance(obj, Article) and request.method not in ['GET', 'HEAD', 'OPTIONS'] and obj.author != request.user:
+    #         self.permission_denied(request)
     
-    # Ineffective caching
-    # def get_object(self):
-    #     articles = cache.get('articles')
-    #     if articles is None:
-    #         self.queryset = self.get_queryset()
-    #         articles = {article.pk: article for article in self.queryset}
-    #         cache.set('articles', articles, timeout=60)
-    #         return super().get_object()
-    #     return articles.get(int(self.kwargs['pk']))
+    # Get object with caching
+    def get_object(self):
+        articles = cache.get('articles')
+        if articles is not None:
+            return articles.get(int(self.kwargs['pk']))
+        queryset = self.filter_queryset(self.get_queryset())
+        articles = {article.pk: article for article in queryset}
+        cache.set('articles', articles, timeout=60)
+        # Perform the lookup filtering.
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+
+        assert lookup_url_kwarg in self.kwargs, (
+            'Expected view %s to be called with a URL keyword argument '
+            'named "%s". Fix your URL conf, or set the `.lookup_field` '
+            'attribute on the view correctly.' %
+            (self.__class__.__name__, lookup_url_kwarg)
+        )
+
+        filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
+        obj = get_object_or_404(queryset, **filter_kwargs)
+
+        # May raise a permission denied
+        self.check_object_permissions(self.request, obj)
+
+        return obj
     
     def retrieve(self, request, *args, **kwargs):
         # article = self.get_cached_articles().get(int(self.kwargs['pk']))
@@ -140,7 +158,6 @@ class ArticleViewSet(mixins.ListModelMixin,
             case _:
                 return ArticleListSerializer
             
-    # TODO: Implement permissions for objects
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
         instance.status = Article.Status.NEW
@@ -159,6 +176,8 @@ class ArticleViewSet(mixins.ListModelMixin,
         return Response(serializer.data)
             
     def create(self, request, *args, **kwargs):
+        if isinstance(request.user, AnonymousUser):
+            return Response({"error: User not logged in"}, status=status.HTTP_401_UNAUTHORIZED)
         request.data['author'] = request.user.id
         serializer = ArticleCreationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
