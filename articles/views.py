@@ -9,7 +9,7 @@ from rest_framework import status, generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser, FileUploadParser
-from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly, SAFE_METHODS
 from .permissions import AuthorshipPermission
 from rest_framework.response import Response
 from rest_framework.request import Request
@@ -99,23 +99,17 @@ class ArticleViewSet(mixins.ListModelMixin,
         queryset = Article.objects.prefetch_related('tags').select_related('author').all()
         if self.action == 'list':
             queryset = queryset.defer('text')
-        # TODO: caching only for results of read
         return queryset
     
-    def retrieve(self, request, *args, **kwargs):
+    def retrieve(self, request, pk, *args, **kwargs):
         # article = self.get_cached_articles().get(int(self.kwargs['pk']))
-        # Get object without caching
-        article = self.get_object()
-        serializer = ArticleDetailsSerializer(article)
-        # serializer.is_valid(raise_exception=True)
-        return Response(serializer.data)
-    
-    def list(self, request, *args, **kwargs):
-        # Get a list without caching
-        articles = self.filter_queryset(self.get_queryset())
-        serializer = ArticleListSerializer(articles, many=True)
-        # serializer.is_valid(raise_exception=True)
-        return Response(serializer.data)
+        article = cache.get(f"articles-{pk}")
+        if article is None:
+            article = self.get_object()
+            serializer = ArticleDetailsSerializer(article)
+            article = serializer.data
+            cache.set(f"articles-{pk}", article, timeout=60*10)
+        return Response(article)
 
     def get_serializer_class(self):
         match self.action:
@@ -139,6 +133,7 @@ class ArticleViewSet(mixins.ListModelMixin,
         serializer.is_valid(raise_exception=True)
         serializer.save()
         check_text.delay(instance.id)
+        cache.delete("articles")
         return Response(serializer.data)
     
     def update(self, request, *args, **kwargs):
@@ -147,27 +142,28 @@ class ArticleViewSet(mixins.ListModelMixin,
         serializer.is_valid(raise_exception=True)
         serializer.save()
         check_text.delay(instance.id)
+        cache.delete("articles")
         return Response(serializer.data)
             
     def create(self, request, *args, **kwargs):
-        if isinstance(request.user, AnonymousUser):
-            return Response({"error: User not logged in"}, status=status.HTTP_401_UNAUTHORIZED)
         request.data['author'] = request.user.id
         serializer = ArticleCreationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
         check_text.delay(instance.id)
         new_serializer = ArticleDetailsSerializer(instance)
-        # print(new_serializer.data)
+        cache.delete("articles")
         return Response(new_serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['put'], parser_classes=[MultiPartParser])
     def upload_image(self, request, pk=None):
+        cache.delete("articles")
         article = self.get_object()
         serializer = ImageUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         article.image = serializer.validated_data['image']
         article.save()
+        cache.delete("articles")
         return Response({'status': 'image uploaded'})
     
 
