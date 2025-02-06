@@ -11,10 +11,10 @@ class TagSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-# class AuthorShowSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = User
-#         fields = ['id', 'username', ]
+class AuthorShowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', ]
 
 
 class CommentListSerializer(serializers.ModelSerializer):
@@ -48,6 +48,7 @@ class CommentUpdateSerializer(serializers.ModelSerializer):
 
 class ArticleDetailsSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True)
+    author = AuthorShowSerializer()
 
     class Meta:
         model = Article
@@ -56,7 +57,7 @@ class ArticleDetailsSerializer(serializers.ModelSerializer):
 
 class ArticleListSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True)
-    author = serializers.CharField()
+    author = serializers.CharField(source='author.username')
 
     class Meta:
         model = Article

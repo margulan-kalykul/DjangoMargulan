@@ -7,6 +7,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExampl
     PolymorphicProxySerializer, inline_serializer
 from rest_framework import status, generics, mixins, viewsets
 from rest_framework.decorators import action
+from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser, FileUploadParser
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
 from .permissions import AuthorshipPermission
@@ -87,46 +88,19 @@ class ArticleViewSet(mixins.ListModelMixin,
     # Base serializer class
     serializer_class = ArticleListSerializer
     # queryset = Article.objects.all()
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = ArticleFilter
+    search_fields = ['title', 'author__username']
+    ordering_fields = ['title']
+    ordering = ['id']
     # parser_classes = [MultiPartParser, JSONParser, FormParser]
 
     def get_queryset(self):
-        queryset = Article.objects.prefetch_related('tags').all()
+        queryset = Article.objects.prefetch_related('tags').select_related('author').all()
         if self.action == 'list':
             queryset = queryset.defer('text')
+        # TODO: caching only for results of read
         return queryset
-    
-    # def check_object_permissions(self, request, obj):
-    #     super().check_object_permissions(request, obj)
-    #     if isinstance(obj, Article) and request.method not in ['GET', 'HEAD', 'OPTIONS'] and obj.author != request.user:
-    #         self.permission_denied(request)
-    
-    # Get object with caching
-    def get_object(self):
-        articles = cache.get('articles')
-        if articles is not None:
-            return articles.get(int(self.kwargs['pk']))
-        queryset = self.filter_queryset(self.get_queryset())
-        articles = {article.pk: article for article in queryset}
-        cache.set('articles', articles, timeout=60)
-        # Perform the lookup filtering.
-        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
-
-        assert lookup_url_kwarg in self.kwargs, (
-            'Expected view %s to be called with a URL keyword argument '
-            'named "%s". Fix your URL conf, or set the `.lookup_field` '
-            'attribute on the view correctly.' %
-            (self.__class__.__name__, lookup_url_kwarg)
-        )
-
-        filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
-        obj = get_object_or_404(queryset, **filter_kwargs)
-
-        # May raise a permission denied
-        self.check_object_permissions(self.request, obj)
-
-        return obj
     
     def retrieve(self, request, *args, **kwargs):
         # article = self.get_cached_articles().get(int(self.kwargs['pk']))
@@ -219,16 +193,17 @@ class CommentViewSet(viewsets.ModelViewSet):
     # Base serializer class
     # serializer_class = CommentListSerializer
     # queryset = Comment.objects.all()
+    permission_classes = [AuthorshipPermission, ]
 
     def get_queryset(self):
         article_id = self.kwargs.get('articles_pk')
         return Comment.objects.filter(article_id=article_id)
         # return Comment.objects.all()
 
-    def check_object_permissions(self, request, obj):
-        super().check_object_permissions(request, obj)
-        if isinstance(obj, Comment) and request.method not in ['GET', 'HEAD', 'OPTIONS'] and obj.author != request.user:
-            self.permission_denied(request)
+    # def check_object_permissions(self, request, obj):
+    #     super().check_object_permissions(request, obj)
+    #     if isinstance(obj, Comment) and request.method not in ['GET', 'HEAD', 'OPTIONS'] and obj.author != request.user:
+    #         self.permission_denied(request)
 
     def get_serializer_class(self):
         match self.action:
