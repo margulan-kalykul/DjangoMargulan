@@ -7,6 +7,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 import time
 from .secret_keys import OPENAI_API
 import openai
+from django.db import transaction, DatabaseError, IntegrityError
 
 @shared_task
 def check_text(article_id):
@@ -35,10 +36,12 @@ def check_text(article_id):
     answer: str = chat.choices[0].message.content
 
     if answer == Article.Status.ACCEPTED:
-        article.status = Article.Status.ACCEPTED
+        status = Article.Status.ACCEPTED
     elif answer == Article.Status.REJECTED:
-        article.status = Article.Status.REJECTED
-    article.save(update_fields=['status', 'updated_at'])
+        status = Article.Status.REJECTED
+    with transaction.atomic():
+        article.status = status
+        article.save(update_fields=['status', 'updated_at'])
 
 @shared_task
 def create_article(data):

@@ -164,6 +164,8 @@ WSGI_APPLICATION = 'mysite.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+# from django.db.backends.postgresql.psycopg_any import IsolationLevel
+
 DATABASES = {
     # 'default': {
     #     'ENGINE': 'django.db.backends.sqlite3',
@@ -176,6 +178,9 @@ DATABASES = {
         'PASSWORD': 'postgres',
         'HOST': 'localhost',
         'PORT': '',
+        # 'OPTIONS': {
+        #     'isolation_level': IsolationLevel.READ_COMMITTED,  # Default isolation level
+        # }
     }
 }
 

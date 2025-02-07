@@ -1,3 +1,5 @@
+import time
+
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404
@@ -16,6 +18,7 @@ from rest_framework.request import Request
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth.models import AnonymousUser
+from django.db import transaction, DatabaseError, IntegrityError
 
 from .models import Article, Comment, Author
 from .filters import ArticleFilter
@@ -100,16 +103,6 @@ class ArticleViewSet(mixins.ListModelMixin,
         if self.action == 'list':
             queryset = queryset.defer('text')
         return queryset
-    
-    def retrieve(self, request, pk, *args, **kwargs):
-        # article = self.get_cached_articles().get(int(self.kwargs['pk']))
-        article = cache.get(f"articles-{pk}")
-        if article is None:
-            article = self.get_object()
-            serializer = ArticleDetailsSerializer(article)
-            article = serializer.data
-            cache.set(f"articles-{pk}", article, timeout=60*10)
-        return Response(article)
 
     def get_serializer_class(self):
         match self.action:
@@ -126,24 +119,51 @@ class ArticleViewSet(mixins.ListModelMixin,
             case _:
                 return ArticleListSerializer
             
-    def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        instance.status = Article.Status.NEW
-        serializer = ArticleUpdateSerializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        check_text.delay(instance.id)
-        cache.delete("articles")
-        return Response(serializer.data)
+    # TODO: add roles: author can create and update, moderator can see but not update, non authorized users can't see
+    def retrieve(self, request, pk, *args, **kwargs):
+        article = cache.get(f"articles-{pk}")
+        if article is None:
+            # time.sleep(10)
+            article = self.get_object()
+            serializer = ArticleDetailsSerializer(article)
+            article = serializer.data
+            cache.set(f"articles-{pk}", article, timeout=60*10)
+        return Response(article)
     
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = ArticleUpdateSerializer(instance, data=request.data, partial=False)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        check_text.delay(instance.id)
+    def post_process(pk):
         cache.delete("articles")
-        return Response(serializer.data)
+        cache.delete(f"articles-{pk}")
+        check_text.delay(pk)
+            
+    def partial_update(self, request, pk, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                instance = self.get_object()
+                instance.status = Article.Status.NEW
+                serializer = ArticleUpdateSerializer(instance, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                transaction.on_commit(lambda: self.post_process(pk))
+                return Response(serializer.data)
+        except Exception:
+            return Response({"message": "Exception"})
+    
+    def update(self, request, pk, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            with transaction.atomic():
+                instance.status = Article.Status.NEW
+                serializer = ArticleUpdateSerializer(instance, data=request.data, partial=False)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                raise DatabaseError
+                check_text.delay(instance.id)
+            cache.delete("articles")
+            cache.delete(f"articles-{pk}")
+        except DatabaseError:
+            return Response({"error": "Error when updating"})
+        else:
+            return Response(serializer.data)
             
     def create(self, request, *args, **kwargs):
         request.data['author'] = request.user.id
@@ -157,14 +177,19 @@ class ArticleViewSet(mixins.ListModelMixin,
 
     @action(detail=True, methods=['put'], parser_classes=[MultiPartParser])
     def upload_image(self, request, pk=None):
-        cache.delete("articles")
         article = self.get_object()
         serializer = ImageUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        article.image = serializer.validated_data['image']
-        article.save()
-        cache.delete("articles")
-        return Response({'status': 'image uploaded'})
+        try:
+            with transaction.atomic():
+                article.image = serializer.validated_data['image']
+                article.save()
+            cache.delete("articles")
+            cache.delete(f"articles-{pk}")
+        except DatabaseError:
+            return Response({"error": "Error when uploading the image"})
+        else:
+            return Response({'status': 'image uploaded'})
     
 
 # Resolves warning for the articles_pk parameter generated in the path by the NestedDefaultRouter
@@ -189,17 +214,11 @@ class CommentViewSet(viewsets.ModelViewSet):
     # Base serializer class
     # serializer_class = CommentListSerializer
     # queryset = Comment.objects.all()
-    permission_classes = [AuthorshipPermission, ]
+    permission_classes = [IsAuthenticatedOrReadOnly, AuthorshipPermission, ]
 
     def get_queryset(self):
         article_id = self.kwargs.get('articles_pk')
         return Comment.objects.filter(article_id=article_id)
-        # return Comment.objects.all()
-
-    # def check_object_permissions(self, request, obj):
-    #     super().check_object_permissions(request, obj)
-    #     if isinstance(obj, Comment) and request.method not in ['GET', 'HEAD', 'OPTIONS'] and obj.author != request.user:
-    #         self.permission_denied(request)
 
     def get_serializer_class(self):
         match self.action:
@@ -218,10 +237,6 @@ class CommentViewSet(viewsets.ModelViewSet):
             case _:
                 return CommentListSerializer
 
-
-    # def get_serializer(self, *args, **kwargs):
-    #     return super().get_serializer(*args, **kwargs)
-    
     def create(self, request, *args, **kwargs):
         request.data['article'] = int(self.kwargs.get('articles_pk'))
         return super().create(request, *args, **kwargs)        
