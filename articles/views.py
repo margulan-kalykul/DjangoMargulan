@@ -11,13 +11,14 @@ from rest_framework import status, generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser, FileUploadParser
-from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly, SAFE_METHODS
-from .permissions import AuthorshipPermission
+from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly, SAFE_METHODS, IsAuthenticated
+from .permissions import AuthorshipPermission, IsAuthor, IsModerator, HasRolePermission
 from rest_framework.response import Response
 from rest_framework.request import Request
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, User, Permission
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction, DatabaseError, IntegrityError
 
 from .models import Article, Comment, Author
@@ -30,6 +31,7 @@ from .tasks import check_text
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
 from django.db.models.query import QuerySet
+from django.contrib.contenttypes.models import ContentType
 
 
 class LoginView(TokenObtainPairView):
@@ -87,7 +89,7 @@ class ArticleViewSet(mixins.ListModelMixin,
                      mixins.UpdateModelMixin,
                      mixins.RetrieveModelMixin,
                      viewsets.GenericViewSet):
-    permission_classes = [IsAuthenticatedOrReadOnly, AuthorshipPermission, ]
+    permission_classes = [IsAuthenticated, HasRolePermission, ]
     # Base serializer class
     serializer_class = ArticleListSerializer
     # queryset = Article.objects.all()
@@ -119,77 +121,69 @@ class ArticleViewSet(mixins.ListModelMixin,
             case _:
                 return ArticleListSerializer
             
-    # TODO: add roles: author can create and update, moderator can see but not update, non authorized users can't see
+    # # Another way for checking user role's permissions
+    # def get_permissions(self):
+    #     if self.action in ['list', 'retrieve']:
+    #         permission_classes = [IsAuthenticated, IsModerator|IsAuthor]
+    #     else:
+    #         permission_classes =  [IsAuthenticated, IsAuthor]
+    #     return [permission() for permission in permission_classes]
+            
     def retrieve(self, request, pk, *args, **kwargs):
         article = cache.get(f"articles-{pk}")
         if article is None:
-            # time.sleep(10)
             article = self.get_object()
             serializer = ArticleDetailsSerializer(article)
             article = serializer.data
             cache.set(f"articles-{pk}", article, timeout=60*10)
         return Response(article)
-    
-    def post_process(pk):
+
+    def post_process(self, pk=None):
         cache.delete("articles")
-        cache.delete(f"articles-{pk}")
+        if pk is not None:
+            cache.delete(f"articles-{pk}")
         check_text.delay(pk)
-            
+
     def partial_update(self, request, pk, *args, **kwargs):
-        try:
-            with transaction.atomic():
-                instance = self.get_object()
-                instance.status = Article.Status.NEW
-                serializer = ArticleUpdateSerializer(instance, data=request.data, partial=True)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
-                transaction.on_commit(lambda: self.post_process(pk))
-                return Response(serializer.data)
-        except Exception:
-            return Response({"message": "Exception"})
+        with transaction.atomic():
+            instance = self.get_object()
+            instance.status = Article.Status.NEW
+            serializer = ArticleUpdateSerializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            transaction.on_commit(lambda: self.post_process(pk))
+            return Response(serializer.data)
     
     def update(self, request, pk, *args, **kwargs):
-        instance = self.get_object()
-        try:
-            with transaction.atomic():
-                instance.status = Article.Status.NEW
-                serializer = ArticleUpdateSerializer(instance, data=request.data, partial=False)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
-                raise DatabaseError
-                check_text.delay(instance.id)
-            cache.delete("articles")
-            cache.delete(f"articles-{pk}")
-        except DatabaseError:
-            return Response({"error": "Error when updating"})
-        else:
+        with transaction.atomic():
+            instance = self.get_object()
+            instance.status = Article.Status.NEW
+            serializer = ArticleUpdateSerializer(instance, data=request.data, partial=False)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            transaction.on_commit(lambda: self.post_process(pk))
             return Response(serializer.data)
             
     def create(self, request, *args, **kwargs):
         request.data['author'] = request.user.id
-        serializer = ArticleCreationSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        instance = serializer.save()
-        check_text.delay(instance.id)
-        new_serializer = ArticleDetailsSerializer(instance)
-        cache.delete("articles")
-        return Response(new_serializer.data, status=status.HTTP_201_CREATED)
+        with transaction.atomic():
+            serializer = ArticleCreationSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            instance = serializer.save()
+            new_serializer = ArticleDetailsSerializer(instance)
+            transaction.on_commit(lambda: self.post_process())
+            return Response(new_serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['put'], parser_classes=[MultiPartParser])
     def upload_image(self, request, pk=None):
-        article = self.get_object()
-        serializer = ImageUploadSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        try:
-            with transaction.atomic():
-                article.image = serializer.validated_data['image']
-                article.save()
-            cache.delete("articles")
-            cache.delete(f"articles-{pk}")
-        except DatabaseError:
-            return Response({"error": "Error when uploading the image"})
-        else:
-            return Response({'status': 'image uploaded'})
+        with transaction.atomic():
+            article = self.get_object()
+            serializer = ImageUploadSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            article.image = serializer.validated_data['image']
+            article.save()
+            transaction.on_commit(lambda: self.post_process(pk))
+            return Response(serializer.data)
     
 
 # Resolves warning for the articles_pk parameter generated in the path by the NestedDefaultRouter
@@ -214,7 +208,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     # Base serializer class
     # serializer_class = CommentListSerializer
     # queryset = Comment.objects.all()
-    permission_classes = [IsAuthenticatedOrReadOnly, AuthorshipPermission, ]
+    permission_classes = [IsAuthenticated, ]
 
     def get_queryset(self):
         article_id = self.kwargs.get('articles_pk')
