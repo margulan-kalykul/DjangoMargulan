@@ -10,7 +10,7 @@ class ArticleForm(forms.ModelForm):
     
     class Meta:
         model = Article
-        fields = ['title', 'text', 'author', 'tags', 'image']
+        fields = ['title', 'text', 'user', 'tags', 'image']
 
     # def __init__(self, *args, **kwargs):
     #     super().__init__(*args, **kwargs)

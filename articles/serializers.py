@@ -1,8 +1,17 @@
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
-from .models import Article, Tag, Comment, Status, Author
-from django.contrib.auth.models import User
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, AuthUser
+from rest_framework_simplejwt.tokens import Token
+
+from .models import Article, Tag, Comment, User
+
+
+class TokenObtainWithGroupSerializer(TokenObtainPairSerializer):
+    # pass
+    @classmethod
+    def get_token(cls, user: AuthUser) -> Token:
+        token = super().get_token(user)
+        token['groups'] = [group.name for group in user.groups.all()]
+        return token
 
 
 class TagSerializer(serializers.ModelSerializer):
@@ -11,7 +20,7 @@ class TagSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class AuthorShowSerializer(serializers.ModelSerializer):
+class UserShowSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', ]
@@ -21,7 +30,7 @@ class CommentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         # exclude = ['created_at', 'status']
-        fields = ['id', 'author', 'text', 'updated_at']
+        fields = ['id', 'user', 'text', 'updated_at']
         read_only = fields
         # extra_kwargs = {'password': {'read_only': True}}
 
@@ -29,7 +38,7 @@ class CommentListSerializer(serializers.ModelSerializer):
 class CommentDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ['author', 'text', 'updated_at']
+        fields = ['user', 'text', 'updated_at']
 
 
 class CommentCreateSerializer(serializers.ModelSerializer):
@@ -37,7 +46,7 @@ class CommentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         # exclude = ['created_at', 'status']
-        fields = ['author', 'text', 'article']
+        fields = ['user', 'text', 'article']
 
 
 class CommentUpdateSerializer(serializers.ModelSerializer):
@@ -48,7 +57,7 @@ class CommentUpdateSerializer(serializers.ModelSerializer):
 
 class ArticleDetailsSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True)
-    author = AuthorShowSerializer()
+    user = UserShowSerializer()
 
     class Meta:
         model = Article
@@ -57,11 +66,11 @@ class ArticleDetailsSerializer(serializers.ModelSerializer):
 
 class ArticleListSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True)
-    author = serializers.CharField(source='author.username')
+    user = serializers.CharField(source='user.username')
 
     class Meta:
         model = Article
-        fields = ['id', 'title', 'tags', 'author', 'image', 'created_at']
+        fields = ['id', 'title', 'tags', 'user', 'image', 'created_at']
 
 
 class ArticleWithCommentsSerializer(serializers.ModelSerializer):
@@ -77,7 +86,7 @@ class ArticleCreationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Article
-        fields = ['title', 'tags', 'author', 'text']
+        fields = ['title', 'tags', 'user', 'text']
 
 
 class ArticleUpdateSerializer(serializers.ModelSerializer):    
@@ -89,12 +98,6 @@ class ArticleUpdateSerializer(serializers.ModelSerializer):
 
 class ImageUploadSerializer(serializers.Serializer):
     image = serializers.ImageField()
-
-
-class AuthorSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Author
-        fields = ['username', 'password']
 
 
 class UserSerializer(serializers.ModelSerializer):

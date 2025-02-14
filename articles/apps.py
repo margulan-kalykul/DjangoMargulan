@@ -7,6 +7,7 @@ class ArticlesConfig(AppConfig):
 
     # Used to connect receivers
     def ready(self):
+        import articles.schema
         # Implicitly connect signal handlers decorated with @receiver.
         from . import signals
 

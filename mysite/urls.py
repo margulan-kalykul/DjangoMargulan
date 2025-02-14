@@ -15,11 +15,8 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include, re_path
-from rest_framework import permissions
-from rest_framework.routers import DefaultRouter
-from rest_framework_nested.routers import NestedDefaultRouter
-from rest_framework_simplejwt.views import TokenRefreshView, TokenObtainPairView
+from django.urls import path, include
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from articles import views
 from django.conf import settings
@@ -27,22 +24,19 @@ from django.conf.urls.static import static
 from debug_toolbar.toolbar import debug_toolbar_urls
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
-articles_router = DefaultRouter()
-articles_router.register(r'articles', views.ArticleViewSet, basename='articles')
-# articles_router.register(r'articles/(?P<article_id>[^/.]+)/comments', views.CommentViewSet, basename='comments')
-comments_router = NestedDefaultRouter(articles_router, r'articles', lookup='articles')
-comments_router.register(r'comments', views.CommentViewSet, basename='article-comments')
+from articles import urls
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('rest/', include('rest_framework.urls')),
-    *articles_router.urls,
-    *comments_router.urls,
-    # YOUR PATTERNS
+    
+    path('main/', include(urls.urlpatterns)),
+    
+    # Swagger urls
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    # Optional UI:
-    path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),  # Optional UI
     path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    # JWT Authorization
     path('login/', views.LoginView.as_view(), name='login'),
     path('token-refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('register/', views.RegisterView.as_view(), name='register'),

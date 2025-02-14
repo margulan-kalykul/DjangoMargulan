@@ -1,5 +1,3 @@
-import time
-
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import Http404, QueryDict
 from django.shortcuts import get_object_or_404
@@ -7,26 +5,34 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, extend_schema_view, \
     PolymorphicProxySerializer, inline_serializer
-from rest_framework import status, generics, mixins, viewsets
+import jwt
+from rest_framework import status, generics, mixins, viewsets, exceptions
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser, FileUploadParser
 from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly, SAFE_METHODS, IsAuthenticated
-from .permissions import AuthorshipPermission, IsAuthor, IsModerator, HasRolePermission
+
+from articles.authentications import RoleAuthentication
+from .permissions import HasRole, IsReader, IsModerator, HasCorrectPermissions
+from mysite.settings import SECRET_KEY
 from rest_framework.response import Response
 from rest_framework.request import Request
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
-from django.contrib.auth.models import AnonymousUser, User, Permission
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.contrib.auth.models import AnonymousUser, Permission, Group
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db import transaction, DatabaseError, IntegrityError
 
-from .models import Article, Comment, Author
+from .models import Article, Comment, User
 from .filters import ArticleFilter
 from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, CommentListSerializer, \
     ArticleListSerializer, \
     ArticleWithCommentsSerializer, CommentCreateSerializer, ArticleUpdateSerializer, CommentDetailsSerializer, \
-    CommentUpdateSerializer, TagSerializer, ImageUploadSerializer, AuthorSerializer, RegistrationSerializer
+    CommentUpdateSerializer, TagSerializer, ImageUploadSerializer, UserSerializer, RegistrationSerializer, \
+    TokenObtainWithGroupSerializer
 from .tasks import check_text
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
@@ -36,7 +42,7 @@ from django.contrib.contenttypes.models import ContentType
 
 class LoginView(TokenObtainPairView):
     permission_classes = [AllowAny, ]
-    serializer_class = TokenObtainPairSerializer
+    serializer_class = TokenObtainWithGroupSerializer
 
 
 class RegisterView(generics.CreateAPIView):
@@ -89,19 +95,20 @@ class ArticleViewSet(mixins.ListModelMixin,
                      mixins.UpdateModelMixin,
                      mixins.RetrieveModelMixin,
                      viewsets.GenericViewSet):
-    permission_classes = [IsAuthenticated, HasRolePermission, ]
+    authentication_classes = [RoleAuthentication, ]
+    permission_classes = [IsAuthenticated, ]
     # Base serializer class
     serializer_class = ArticleListSerializer
     # queryset = Article.objects.all()
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = ArticleFilter
-    search_fields = ['title', 'author__username']
+    search_fields = ['title', 'user__username']
     ordering_fields = ['title']
     ordering = ['id']
     # parser_classes = [MultiPartParser, JSONParser, FormParser]
 
     def get_queryset(self):
-        queryset = Article.objects.prefetch_related('tags').select_related('author').all()
+        queryset = Article.objects.prefetch_related('tags').select_related('user').all()
         if self.action == 'list':
             queryset = queryset.defer('text')
         return queryset
@@ -121,16 +128,16 @@ class ArticleViewSet(mixins.ListModelMixin,
             case _:
                 return ArticleListSerializer
             
-    # # Another way for checking user role's permissions
-    # def get_permissions(self):
-    #     if self.action in ['list', 'retrieve']:
-    #         permission_classes = [IsAuthenticated, IsModerator|IsAuthor]
-    #     else:
-    #         permission_classes =  [IsAuthenticated, IsAuthor]
-    #     return [permission() for permission in permission_classes]
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated(), HasRole(['author', 'moderator'])]
+        elif self.action in ['create', 'update', 'partial_update', 'delete', 'upload_image']:
+            return [IsAuthenticated(), HasRole(['author'])]
+        return super().get_permissions()
             
     def retrieve(self, request, pk, *args, **kwargs):
         article = cache.get(f"articles-{pk}")
+        self.check_object_permissions(request, article)
         if article is None:
             article = self.get_object()
             serializer = ArticleDetailsSerializer(article)
@@ -142,7 +149,7 @@ class ArticleViewSet(mixins.ListModelMixin,
         cache.delete("articles")
         if pk is not None:
             cache.delete(f"articles-{pk}")
-        check_text.delay(pk)
+            check_text.delay(pk)
 
     def partial_update(self, request, pk, *args, **kwargs):
         with transaction.atomic():
@@ -165,7 +172,7 @@ class ArticleViewSet(mixins.ListModelMixin,
             return Response(serializer.data)
             
     def create(self, request, *args, **kwargs):
-        request.data['author'] = request.user.id
+        request.data['user'] = request.user.id
         with transaction.atomic():
             serializer = ArticleCreationSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -209,6 +216,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     # serializer_class = CommentListSerializer
     # queryset = Comment.objects.all()
     permission_classes = [IsAuthenticated, ]
+    authentication_classes = [RoleAuthentication, ]
 
     def get_queryset(self):
         article_id = self.kwargs.get('articles_pk')
@@ -230,6 +238,13 @@ class CommentViewSet(viewsets.ModelViewSet):
                 return CommentDetailsSerializer
             case _:
                 return CommentListSerializer
+    
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated(), HasRole(['author', 'moderator'])]
+        elif self.action in ['create', 'update', 'partial_update', 'delete', 'upload_image']:
+            return [IsAuthenticated(), HasRole(['author'])]
+        return super().get_permissions()
 
     def create(self, request, *args, **kwargs):
         request.data['article'] = int(self.kwargs.get('articles_pk'))

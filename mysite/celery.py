@@ -1,6 +1,7 @@
 import os
 
-from django.conf import settings
+# use settings dynamically
+# from django.conf import settings
 
 from celery import Celery
 

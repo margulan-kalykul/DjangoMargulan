@@ -119,6 +119,16 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'Your project description',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'SWAGGER_UI_SETTINGS': {
+        "persistAuthorization": True,  # Keeps the token after page refresh
+    },
+    'SECURITY_DEFINITIONS': {
+        'roleAuth': {
+            'type': 'http',
+            'scheme': 'bearer',
+            'bearerFormat': 'JWT',
+        },
+    },
     # OTHER SETTINGS
     # This splits components into request and response parts, which allows files to be uploaded in swagger ui
     'COMPONENT_SPLIT_REQUEST': True,
@@ -187,6 +197,8 @@ DATABASES = {
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
+
+AUTH_USER_MODEL = 'articles.User'
 
 AUTH_PASSWORD_VALIDATORS = [
     {

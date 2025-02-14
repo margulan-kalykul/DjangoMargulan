@@ -1,7 +1,7 @@
 import django_filters
 from .models import Tag, Article
 from django import forms
-from django.db.models import Q
+# from django.db.models import Q
 
 
 class ArticleFilter(django_filters.FilterSet):
@@ -17,14 +17,14 @@ class ArticleFilter(django_filters.FilterSet):
         # conjoined=True,
     )
 
-    author = django_filters.CharFilter(field_name='author__username', lookup_expr='icontains')
+    user = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
 
-    # search = django_filters.CharFilter(method='author_title_filter', label='General search')
+    # search = django_filters.CharFilter(method='user_title_filter', label='General search')
 
-    # def author_title_filter(self, queryset, name, value):
+    # def user_title_filter(self, queryset, name, value):
     #     return queryset.filter(
     #         Q(title__icontains=value) |
-    #         Q(author__username__icontains=value)
+    #         Q(user__username__icontains=value)
     #     )
     
     # Check the box to show only NEW and ACCEPTED articles

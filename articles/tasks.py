@@ -2,12 +2,10 @@
 
 from .models import Article
 from celery import shared_task
-from .serializers import ImageUploadSerializer, ArticleUpdateSerializer, ArticleCreationSerializer
-from django.core.files.uploadedfile import InMemoryUploadedFile
-import time
+from .serializers import ArticleUpdateSerializer, ArticleCreationSerializer
 from .secret_keys import OPENAI_API
 import openai
-from django.db import transaction, DatabaseError, IntegrityError
+from django.db import transaction
 
 @shared_task
 def check_text(article_id):
