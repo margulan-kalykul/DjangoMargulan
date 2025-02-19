@@ -1,43 +1,29 @@
-from django.core.handlers.wsgi import WSGIRequest
-from django.http import Http404, QueryDict
-from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, extend_schema_view, \
-    PolymorphicProxySerializer, inline_serializer
-import jwt
-from rest_framework import status, generics, mixins, viewsets, exceptions
-from rest_framework.authentication import TokenAuthentication
+from drf_spectacular.utils import extend_schema, OpenApiParameter, extend_schema_view
+from rest_framework import status, generics, mixins, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
-from rest_framework.parsers import JSONParser, MultiPartParser, FormParser, FileUploadParser
-from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly, SAFE_METHODS, IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, FileUploadParser
+from rest_framework.permissions import AllowAny, IsAuthenticated
+import rest_framework.serializers
 
 from articles.authentications import RoleAuthentication
-from .permissions import HasRole, IsReader, IsModerator, HasCorrectPermissions
-from mysite.settings import SECRET_KEY
+from articles.services import article_service, comment_service
+from .permissions import HasRole
 from rest_framework.response import Response
-from rest_framework.request import Request
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.tokens import AccessToken
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from django.contrib.auth.models import AnonymousUser, Permission, Group
-from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.db import transaction, DatabaseError, IntegrityError
+from django.db import transaction
 
-from .models import Article, Comment, User
+from .models import Article, Comment, Status
 from .filters import ArticleFilter
 from .serializers import ArticleDetailsSerializer, ArticleCreationSerializer, CommentListSerializer, \
     ArticleListSerializer, \
-    ArticleWithCommentsSerializer, CommentCreateSerializer, ArticleUpdateSerializer, CommentDetailsSerializer, \
-    CommentUpdateSerializer, TagSerializer, ImageUploadSerializer, UserSerializer, RegistrationSerializer, \
+    CommentCreateSerializer, ArticleUpdateSerializer, CommentDetailsSerializer, \
+    CommentUpdateSerializer, ImageUploadSerializer, RegistrationSerializer, \
     TokenObtainWithGroupSerializer
 from .tasks import check_text
-from django.views.decorators.cache import cache_page
 from django.core.cache import cache
-from django.db.models.query import QuerySet
-from django.contrib.contenttypes.models import ContentType
+from rest_framework.serializers import ModelSerializer
 
 
 class LoginView(TokenObtainPairView):
@@ -108,10 +94,11 @@ class ArticleViewSet(mixins.ListModelMixin,
     # parser_classes = [MultiPartParser, JSONParser, FormParser]
 
     def get_queryset(self):
-        queryset = Article.objects.prefetch_related('tags').select_related('user').all()
+        service = article_service.ArticleListService()
+        exclude_fields = None
         if self.action == 'list':
-            queryset = queryset.defer('text')
-        return queryset
+            exclude_fields = ['text']
+        return service.execute(exclude_fields)
 
     def get_serializer_class(self):
         match self.action:
@@ -134,63 +121,73 @@ class ArticleViewSet(mixins.ListModelMixin,
         elif self.action in ['create', 'update', 'partial_update', 'delete', 'upload_image']:
             return [IsAuthenticated(), HasRole(['author'])]
         return super().get_permissions()
+    
+    def get_object(self):
+        pk = self.kwargs.get('articles_pk')
+        if pk is None:
+            raise Exception('Article id is not given.')
+        service = article_service.ArticleRetrieveService()
+        article = service.execute(pk)
+        self.check_object_permissions(self.request, article)
+        return article
+    
+    # def list(self, request, *args, **kwargs):
+    #     serialized_articles = cache.get("articles")
+    #     if serialized_articles is None:
+    #         articles = super().list(request, *args, **kwargs)
+    #         serializer = self.get_serializer(articles)
+    #         serialized_articles = serializer.data
+    #         cache.set("articles", serialized_articles, timeout=60*10)
+    #     return Response(serialized_articles)
             
     def retrieve(self, request, pk, *args, **kwargs):
-        article = cache.get(f"articles-{pk}")
-        self.check_object_permissions(request, article)
-        if article is None:
+        serialized_article = cache.get(f"articles-{pk}")
+        if serialized_article is None:
             article = self.get_object()
-            serializer = ArticleDetailsSerializer(article)
-            article = serializer.data
-            cache.set(f"articles-{pk}", article, timeout=60*10)
-        return Response(article)
-
-    def post_process(self, pk=None):
-        cache.delete("articles")
-        if pk is not None:
-            cache.delete(f"articles-{pk}")
-            check_text.delay(pk)
+            serializer = self.get_serializer(article)
+            serialized_article = serializer.data
+            cache.set(f"articles-{pk}", serialized_article, timeout=60*10)
+        return Response(serialized_article)
 
     def partial_update(self, request, pk, *args, **kwargs):
-        with transaction.atomic():
-            instance = self.get_object()
-            instance.status = Article.Status.NEW
-            serializer = ArticleUpdateSerializer(instance, data=request.data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            transaction.on_commit(lambda: self.post_process(pk))
-            return Response(serializer.data)
+        return self.update(request, pk, *args, partial=True, **kwargs)
     
     def update(self, request, pk, *args, **kwargs):
-        with transaction.atomic():
-            instance = self.get_object()
-            instance.status = Article.Status.NEW
-            serializer = ArticleUpdateSerializer(instance, data=request.data, partial=False)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            transaction.on_commit(lambda: self.post_process(pk))
-            return Response(serializer.data)
+        # Get variable that decides if the update is partial or not
+        partial = kwargs.get('partial')
+        if partial is None:
+            partial = False
+        # Validation
+        serializer = self.get_serializer(data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        # Make an entity from request.data
+        article_entity = article_service.ArticleEntity(**serializer.validated_data)
+        # Perform update
+        update_service = article_service.ArticleUpdateService()
+        update_service.execute(pk, article_entity)
+        # Get new updated article
+        retrieve_service = article_service.ArticleRetrieveService()
+        article = retrieve_service.execute(pk)
+        # Serialize it and return
+        serializer = self.get_serializer(article)
+        return Response(serializer.data)
             
     def create(self, request, *args, **kwargs):
-        request.data['user'] = request.user.id
-        with transaction.atomic():
-            serializer = ArticleCreationSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            instance = serializer.save()
-            new_serializer = ArticleDetailsSerializer(instance)
-            transaction.on_commit(lambda: self.post_process())
-            return Response(new_serializer.data, status=status.HTTP_201_CREATED)
+        # Validation
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        # Make an entity from request.data
+        article_entity = article_service.ArticleEntity(user_id=request.user.id, **serializer.validated_data)
+        # Perform create and get the newly created article
+        create_service = article_service.ArticleCreateService()
+        article = create_service.execute(article_entity)
+        # Serialize the article and return
+        serializer = self.get_serializer(article)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['put'], parser_classes=[MultiPartParser])
-    def upload_image(self, request, pk=None):
-        with transaction.atomic():
-            article = self.get_object()
-            serializer = ImageUploadSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            article.image = serializer.validated_data['image']
-            article.save()
-            transaction.on_commit(lambda: self.post_process(pk))
-            return Response(serializer.data)
+    def upload_image(self, request, pk=None, *args, **kwargs):
+        return self.update(request, pk, *args, partial=True, **kwargs)
     
 
 # Resolves warning for the articles_pk parameter generated in the path by the NestedDefaultRouter
@@ -219,8 +216,8 @@ class CommentViewSet(viewsets.ModelViewSet):
     authentication_classes = [RoleAuthentication, ]
 
     def get_queryset(self):
-        article_id = self.kwargs.get('articles_pk')
-        return Comment.objects.filter(article_id=article_id)
+        service = comment_service.CommentListService()
+        return service.execute(int(self.kwargs.get('articles_pk')))
 
     def get_serializer_class(self):
         match self.action:
@@ -245,7 +242,60 @@ class CommentViewSet(viewsets.ModelViewSet):
         elif self.action in ['create', 'update', 'partial_update', 'delete', 'upload_image']:
             return [IsAuthenticated(), HasRole(['author'])]
         return super().get_permissions()
+    
+    def get_object(self):
+        pk = self.kwargs.get('pk')
+        if pk is None:
+            raise Exception('Article id is not given.')
+        service = comment_service.CommentRetrieveService()
+        comment = service.execute(pk)
+        self.check_object_permissions(self.request, comment)
+        return comment
+
+    def partial_update(self, request, pk, *args, **kwargs):
+        return self.update(request, pk, *args, partial=True, **kwargs)
+    
+    def update(self, request, pk, *args, **kwargs):
+        # Get variable that decides if the update is partial or not
+        partial = kwargs.get('partial')
+        if partial is None:
+            partial = False
+        # Set comment as new
+        request.data['status'] = Status.NEW
+        # Validation
+        serializer = self.get_serializer(data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        # Make an entity from request.data
+        comment_entity = comment_service.CommentEntity(
+            article=serializer.validated_data.get('article'),
+            user=serializer.validated_data.get('user'),
+            text=serializer.validated_data.get('text')
+        )
+        # Perform update
+        update_service = comment_service.CommentUpdateService()
+        update_service.execute(pk, comment_entity)
+        # Get new updated comment
+        retrieve_service = comment_service.CommentRetrieveService()
+        comment = retrieve_service.execute(pk)
+        # Serialize it and return
+        serializer = self.get_serializer(comment, partial=partial)
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
         request.data['article'] = int(self.kwargs.get('articles_pk'))
-        return super().create(request, *args, **kwargs)        
+        request.data['user'] = request.user.id
+        # Validation
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        # Make an entity from request.data
+        comment_entity = comment_service.CommentEntity(
+            article=serializer.validated_data.get('article'),
+            user=serializer.validated_data.get('user'),
+            text=serializer.validated_data.get('text')
+        )
+        # Perform create and get the newly created comment
+        create_service = comment_service.CommentCreateService()
+        comment = create_service.execute(comment_entity)
+        # Serialize the comment and return
+        serializer = self.get_serializer(comment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

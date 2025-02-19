@@ -9,7 +9,10 @@ from django.db import transaction
 
 @shared_task
 def check_text(article_id):
-    article = Article.objects.get(pk=article_id)
+    try:
+        article = Article.objects.get(pk=article_id)
+    except Exception as e:
+        raise e
     text = article.text
     query = f"""
     Check the text provided if it contains any mentions of terrorism. If it does return this single string - 

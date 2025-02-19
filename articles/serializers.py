@@ -82,14 +82,28 @@ class ArticleWithCommentsSerializer(serializers.ModelSerializer):
 
 
 class ArticleCreationSerializer(serializers.ModelSerializer):
-    tags = serializers.ListField(child=serializers.IntegerField())
+    # tags = serializers.ListField(child=serializers.IntegerField())
+    tags = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(),
+        many=True
+    )
+    # tags = serializers.SerializerMethodField()
+
+    # def get_tags(self, obj):
+    #     return [tag.id for tag in obj.tags.all()]
 
     class Meta:
         model = Article
-        fields = ['title', 'tags', 'user', 'text']
+        fields = ['title', 'tags', 'text']
 
 
-class ArticleUpdateSerializer(serializers.ModelSerializer):    
+class ArticleUpdateSerializer(serializers.ModelSerializer):
+    # tags = serializers.ListField(child=serializers.IntegerField())
+    # tags = serializers.PrimaryKeyRelatedField(
+    #     queryset=Article.objects.prefetch_related('tags').select_related('user').defer('text').all(),
+    #     many=True
+    # )
+
     class Meta:
         model = Article
         fields = ['title', 'tags', 'text']
